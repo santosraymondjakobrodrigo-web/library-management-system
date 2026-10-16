@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-zinc-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Management System - Responsive</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+    </style>
+</head>
+<body class="h-full font-sans text-zinc-900 antialiased overflow-hidden selection:bg-zinc-900 selection:text-white">
+
+    <div class="flex h-screen w-screen bg-zinc-950 overflow-hidden relative">
+
+        <!-- ================= MOBILE SIDEBAR BACKDROP ================= -->
+        <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-20 hidden md:hidden"></div>
+
+        <!-- ================= SIDEBAR ================= -->
+        <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 bg-zinc-950 text-zinc-400 flex flex-col justify-between border-r border-zinc-800/80 transition-transform duration-300 transform -translate-x-full md:translate-x-0 z-30 select-none shrink-0">
+            <div class="p-5 flex flex-col gap-6">
+                <div class="flex items-center justify-between px-2">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-white text-zinc-950 flex items-center justify-center font-bold text-sm shadow-sm">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                        </div>
+                        <div>
+                            <h1 class="font-semibold text-white tracking-tight text-sm">ARCHIVE LMS</h1>
+                            <p class="text-[10px] text-zinc-500 font-mono">REMOTE SYNC</p>
+                        </div>
+                    </div>
+                    <button onclick="toggleSidebar()" class="md:hidden text-zinc-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="bg-zinc-900/80 border border-zinc-800/60 rounded-xl p-3 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div id="sidebar-initials" class="w-8 h-8 rounded-full bg-zinc-800 text-zinc-200 font-medium text-xs flex items-center justify-center border border-zinc-700">AD</div>
+                        <div>
+                            <p id="sidebar-name" class="text-xs font-medium text-zinc-200">System Admin</p>
+                            <p id="sidebar-role" class="text-[10px] text-zinc-500">Main Librarian</p>
+                        </div>
+                    </div>
+                </div>
+
+                <nav class="space-y-1">
+                    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium bg-white text-zinc-950 shadow-sm transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                        <span>Dashboard</span>
+                    </button>
+                    <button onclick="switchTab('catalog')" id="nav-catalog" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                        <span>Catalog</span>
+                    </button>
+                    <button onclick="switchTab('members')" id="nav-members" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                        <span>Members</span>
+                    </button>
+                    <button onclick="switchTab('loans')" id="nav-loans" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                        <span>Circulation & Loans</span>
+                    </button>
+                    <button onclick="switchTab('reports')" id="nav-reports" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        <span>Reports & Analytics</span>
+                    </button>
+                    <button onclick="switchTab('settings')" id="nav-settings" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <span>System Settings</span>
+                    </button>
+                </nav>
+            </div>
+
+            <div class="p-5 border-t border-zinc-800/80">
+                <button onclick="logoutSession()" class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-800 transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    <span>Sign Out</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- ================= MAIN CONTENT AREA ================= -->
+        <main class="flex-1 flex flex-col bg-white md:rounded-l-2xl shadow-2xl overflow-hidden border-l border-zinc-800 w-full">
+            <header class="h-16 border-b border-zinc-200 px-4 md:px-6 flex items-center justify-between bg-white shrink-0">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-lg bg-zinc-100 text-zinc-800 hover:bg-zinc-200">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+                    <h2 id="page-title" class="font-semibold text-zinc-900 text-sm md:text-base tracking-tight truncate">Dashboard Overview</h2>
+                </div>
+
+                <div class="flex items-center gap-2 md:gap-3">
+                    <button onclick="loadDataFromDatabase()" class="hidden sm:block px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-xl text-xs font-medium transition-all">🔄 Sync</button>
+                    <button onclick="openModal('modal-add-book')" class="px-3 py-1.5 bg-zinc-900 text-white rounded-xl text-xs font-medium hover:bg-zinc-800 transition-all shadow-sm">+ Add Book</button>
+                    <div class="flex items-center gap-2.5 pl-1">
+                        <div id="header-initials" class="w-8 h-8 rounded-full bg-zinc-900 text-white font-medium text-xs flex items-center justify-center shadow-sm">AD</div>
+                    </div>
+                </div>
+            </header>
+
+            <div id="content-viewport" class="flex-1 overflow-y-auto p-4 md:p-6 bg-zinc-50/50">
+                
+                <!-- DASHBOARD VIEW -->
+                <div id="view-dashboard" class="space-y-6 max-w-7xl mx-auto">
+                    <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+                        <div class="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                            <span class="text-[10px] md:text-[11px] font-semibold text-zinc-500 uppercase">Total Titles</span>
+                            <h3 id="stat-total-books" class="text-xl md:text-2xl font-bold text-zinc-900 mt-2">0</h3>
+                        </div>
+                        <div class="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                            <span class="text-[10px] md:text-[11px] font-semibold text-zinc-500 uppercase">Active Members</span>
+                            <h3 id="stat-active-members" class="text-xl md:text-2xl font-bold text-zinc-900 mt-2">0</h3>
+                        </div>
+                        <div class="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                            <span class="text-[10px] md:text-[11px] font-semibold text-zinc-500 uppercase">Checked Out</span>
+                            <h3 id="stat-checked-out" class="text-xl md:text-2xl font-bold text-zinc-900 mt-2">0</h3>
+                        </div>
+                        <div class="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                            <span class="text-[10px] md:text-[11px] font-semibold text-zinc-500 uppercase">Overdue Items</span>
+                            <h3 id="stat-overdue" class="text-xl md:text-2xl font-bold text-zinc-900 mt-2">0</h3>
+                        </div>
+                        <div class="col-span-2 sm:col-span-1 bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                            <span class="text-[10px] md:text-[11px] font-semibold text-zinc-500 uppercase">Pending Fines</span>
+                            <h3 id="stat-pending-fines" class="text-xl md:text-2xl font-bold text-zinc-900 mt-2">$0.00</h3>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 bg-white p-4 md:p-6 rounded-2xl border border-zinc-200 shadow-sm">
+                            <h3 class="font-bold text-zinc-900 text-sm mb-4">Recent Activity Log</h3>
+                            <div id="activity-log-list" class="divide-y divide-zinc-100 max-h-[300px] overflow-y-auto"></div>
+                        </div>
+                        <div class="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm space-y-3">
+                            <h3 class="font-bold text-zinc-900 text-sm">Quick Terminal</h3>
+                            <button onclick="openModal('modal-add-book')" class="w-full p-2.5 bg-zinc-50 hover:bg-zinc-900 hover:text-white rounded-xl border text-xs font-medium transition-all">+ Add Book</button>
+                            <button onclick="openModal('modal-add-member')" class="w-full p-2.5 bg-zinc-50 hover:bg-zinc-900 hover:text-white rounded-xl border text-xs font-medium transition-all">+ Register Member</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CATALOG VIEW -->
+                <div id="view-catalog" class="space-y-6 max-w-7xl mx-auto hidden">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-zinc-900 text-base md:text-lg">Book Inventory Catalog</h3>
+                        <button onclick="openModal('modal-add-book')" class="px-3 md:px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs">+ Add Book</button>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-x-auto">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-zinc-100 text-zinc-600 uppercase text-[10px] border-b">
+                                <tr>
+                                    <th class="p-4">Title & Author</th>
+                                    <th class="p-4">ISBN</th>
+                                    <th class="p-4">Genre</th>
+                                    <th class="p-4">Shelf</th>
+                                    <th class="p-4">Copies (Avail/Total)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="catalog-table-body" class="divide-y divide-zinc-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- MEMBERS VIEW -->
+                <div id="view-members" class="space-y-6 max-w-7xl mx-auto hidden">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-zinc-900 text-base md:text-lg">Members Directory</h3>
+                        <button onclick="openModal('modal-add-member')" class="px-3 md:px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs">+ Add Member</button>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-x-auto">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-zinc-100 text-zinc-600 uppercase text-[10px] border-b">
+                                <tr>
+                                    <th class="p-4">Member Name</th>
+                                    <th class="p-4">ID</th>
+                                    <th class="p-4">Email</th>
+                                    <th class="p-4">Status</th>
+                                    <th class="p-4">Fine Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="members-table-body" class="divide-y divide-zinc-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- LOANS VIEW -->
+                <div id="view-loans" class="space-y-6 max-w-7xl mx-auto hidden">
+                    <h3 class="font-bold text-zinc-900 text-lg">Circulation & Loans</h3>
+                    <div class="bg-white p-6 rounded-2xl border shadow-sm text-xs text-zinc-500">Circulation records active.</div>
+                </div>
+
+                <!-- REPORTS VIEW -->
+                <div id="view-reports" class="space-y-6 max-w-7xl mx-auto hidden">
+                    <h3 class="font-bold text-zinc-900 text-lg">Reports & Analytics</h3>
+                    <div class="bg-white p-6 rounded-2xl border shadow-sm text-xs">Total synchronized database entries: <span id="rep-total" class="font-bold font-mono">0</span></div>
+                </div>
+
+                <!-- SETTINGS VIEW -->
+                <div id="view-settings" class="space-y-6 max-w-7xl mx-auto hidden">
+                    <h3 class="font-bold text-zinc-900 text-lg">System Settings</h3>
+                    <div class="bg-white p-6 rounded-2xl border shadow-sm max-w-xl text-xs space-y-3">
+                        <label class="font-bold">Active API Endpoint URL</label>
+                        <input type="text" id="setting-api-url" class="w-full p-2 bg-zinc-50 border rounded-lg font-mono" placeholder="http://localhost:3000">
+                        <button onclick="saveApiUrlSetting()" class="px-4 py-2 bg-zinc-900 text-white rounded-lg text-xs font-medium">Update & Reconnect</button>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODALS -->
+    <div id="modal-add-book" class="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl border shadow-2xl p-6 space-y-4 text-xs max-h-[90vh] overflow-y-auto">
+            <h3 class="font-bold text-sm border-b pb-2">Add Book</h3>
+            <form id="form-add-book" onsubmit="handleSaveBook(event)" class="space-y-3">
+                <div><label class="font-semibold text-zinc-700">Book ID *</label><input type="text" id="book-input-id" value="101" required class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
+                <div><label class="font-semibold text-zinc-700">Title *</label><input type="text" id="book-input-title" value="The Great King" required class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
+                <div><label class="font-semibold text-zinc-700">Author *</label><input type="text" id="book-input-author" value="Luther" required class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
+                <div><label class="font-semibold text-zinc-700">ISBN *</label><input type="text" id="book-input-isbn" value="LB-101" required class="w-full p-2 border rounded-lg font-mono mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
+                <div><label class="font-semibold text-zinc-700">Genre</label><input type="text" id="book-input-genre" value="Classic Fiction" class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="font-semibold text-zinc-700">Total Copies</label><input type="number" id="book-input-copies" value="5" class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
+                    <div><label class="font-semibold text-zinc-700">Shelf</label><input type="text" id="book-input-shelf" value="A-01" class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
+                </div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" onclick="closeModal('modal-add-book')" class="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 rounded-lg text-zinc-800 font-medium transition-all">Cancel</button>
+                    <button type="submit" id="btn-submit-book" class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg font-medium transition-all shadow-sm">Save Book</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-add-member" class="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl border shadow-2xl p-6 space-y-4 text-xs max-h-[90vh] overflow-y-auto">
+            <h3 class="font-bold text-sm border-b pb-2">Register Member</h3>
+            <form id="form-add-member" onsubmit="handleSaveMember(event)" class="space-y-3">
+                <div><label class="font-semibold text-zinc-700">Member ID *</label><input type="text" id="member-input-id" required class="w-full p-2 border rounded-lg font-mono mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
+                <div><label class="font-semibold text-zinc-700">Full Name *</label><input type="text" id="member-input-name" required class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
+                <div><label class="font-semibold text-zinc-700">Email *</label><input type="email" id="member-input-email" required class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" onclick="closeModal('modal-add-member')" class="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 rounded-lg text-zinc-800 font-medium transition-all">Cancel</button>
+                    <button type="submit" id="btn-submit-member" class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg font-medium transition-all shadow-sm">Save Member</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-6 right-6 bg-zinc-950 text-white px-4 py-3 rounded-xl shadow-2xl text-xs font-medium transform translate-y-24 opacity-0 transition-all duration-300 z-50">Action completed</div>
+
+    <!-- SCRIPT CONTROLLER WITH REMOTE / DYNAMIC API ROUTING -->
+    <script>
+        // Dynamic API Base URL Config (Nagbabago kung local o naka-ngrok/remote)
+        let API_BASE_URL = localStorage.getItem('lms_api_url') || 'http://localhost:3000';
+
+        let activeSession = JSON.parse(localStorage.getItem('lms_session') || 'null');
+        if (!activeSession) {
+            activeSession = { name: "System Admin", role: "Main Librarian" };
+        }
+
+        let books = [];
+        let members = [];
+        let loans = [];
+        let activityLog = [{ text: "System initialized and ready", time: "Just now" }];
+
+        window.onload = function() {
+            document.getElementById('setting-api-url').value = API_BASE_URL;
+            loadUserProfile();
+            loadDataFromDatabase();
+        };
+
+        function saveApiUrlSetting() {
+            const newUrl = document.getElementById('setting-api-url').value.trim();
+            if (newUrl) {
+                API_BASE_URL = newUrl.replace(/\/$/, ""); // Tanggalin ang trailing slash kung meron
+                localStorage.setItem('lms_api_url', API_BASE_URL);
+                showToast("API URL updated successfully!");
+                loadDataFromDatabase();
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
+
+        function loadUserProfile() {
+            if (!activeSession) return;
+            const name = activeSession.name;
+            const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            document.getElementById('sidebar-initials').innerText = initials;
+            document.getElementById('sidebar-name').innerText = name;
+            document.getElementById('sidebar-role').innerText = activeSession.role;
+            document.getElementById('header-initials').innerText = initials;
+        }
+
+        async function loadDataFromDatabase() {
+            try {
+                const resBooks = await fetch(`${API_BASE_URL}/api/books`);
+                if (resBooks.ok) books = await resBooks.json();
+
+                const resMembers = await fetch(`${API_BASE_URL}/api/members`);
+                if (resMembers.ok) members = await resMembers.json();
+
+                renderAllViews();
+                showToast("Synced with server!");
+            } catch (error) {
+                console.warn("Server offline or unreachable. Using fallback.", error);
+                renderAllViews();
+                showToast("Running in offline local mode.");
+            }
+        }
+
+        function renderAllViews() {
+            renderDashboard();
+            renderCatalog();
+            renderMembers();
+        }
+
+        function renderDashboard() {
+            document.getElementById('stat-total-books').innerText = books.length;
+            document.getElementById('stat-active-members').innerText = members.length;
+            document.getElementById('stat-checked-out').innerText = loans.length;
+            document.getElementById('stat-overdue').innerText = "0";
+            document.getElementById('stat-pending-fines').innerText = "$0.00";
+            document.getElementById('rep-total').innerText = books.length;
+
+            const logContainer = document.getElementById('activity-log-list');
+            logContainer.innerHTML = activityLog.map(item => `
+                <div class="py-2.5 flex items-center justify-between text-xs">
+                    <span class="text-zinc-800 font-medium">${item.text}</span>
+                    <span class="text-[10px] text-zinc-400 font-mono">${item.time}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderCatalog() {
+            const tbody = document.getElementById('catalog-table-body');
+            tbody.innerHTML = books.map(b => `
+                <tr class="hover:bg-zinc-50 border-b border-zinc-100">
+                    <td class="p-4 font-semibold">${b.Title || b.title || b.TITLE}<span class="block font-normal text-zinc-500 text-[11px]">${b.Author || b.author || b.AUTHOR}</span></td>
+                    <td class="p-4 font-mono">${b.ISBN || b.isbn || ''}</td>
+                    <td class="p-4">${b.Genre || b.genre || b.GENRE || ''}</td>
+                    <td class="p-4 font-mono">${b.Shelf || b.shelf || b.SHELF || ''}</td>
+                    <td class="p-4"><span class="font-bold">${b.AvailableCopies ?? b.availableCopies ?? b.TOTALCOPIES ?? 0}</span> / ${b.TotalCopies ?? b.totalCopies ?? b.TOTALCOPIES ?? 0}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderMembers() {
+            const tbody = document.getElementById('members-table-body');
+            tbody.innerHTML = members.map(m => `
+                <tr class="hover:bg-zinc-50 border-b border-zinc-100">
+                    <td class="p-4 font-semibold">${m.Name || m.name || m.NAME}</td>
+                    <td class="p-4 font-mono">${m.ID || m.id}</td>
+                    <td class="p-4">${m.Email || m.email || m.EMAIL || ''}</td>
+                    <td class="p-4">${m.Status || m.status || 'Active'}</td>
+                    <td class="p-4 font-mono">$0.00</td>
+                </tr>
+            `).join('');
+        }
+
+        async function handleSaveBook(e) {
+            e.preventDefault();
+            const btnSubmit = document.getElementById('btn-submit-book');
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = 'Saving...';
+
+            const newBook = {
+                bookId: document.getElementById('book-input-id').value,
+                title: document.getElementById('book-input-title').value,
+                author: document.getElementById('book-input-author').value,
+                isbn: document.getElementById('book-input-isbn').value,
+                genre: document.getElementById('book-input-genre').value,
+                totalCopies: parseInt(document.getElementById('book-input-copies').value) || 1,
+                availableCopies: parseInt(document.getElementById('book-input-copies').value) || 1,
+                shelf: document.getElementById('book-input-shelf').value
+            };
+
+            books.push(newBook);
+            activityLog.unshift({ text: `Added book '${newBook.title}'`, time: "Just now" });
+            renderAllViews();
+
+            try {
+                await fetch(`${API_BASE_URL}/api/books`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newBook)
+                });
+                showToast("Book synced to server!");
+            } catch (err) {
+                showToast("Book saved locally.");
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = 'Save Book';
+                closeModal('modal-add-book');
+            }
+        }
+
+        async function handleSaveMember(e) {
+            e.preventDefault();
+            const btnSubmit = document.getElementById('btn-submit-member');
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = 'Saving...';
+
+            const newMember = {
+                id: document.getElementById('member-input-id').value,
+                name: document.getElementById('member-input-name').value,
+                email: document.getElementById('member-input-email').value,
+                status: "Active",
+                fineBalance: 0.00
+            };
+
+            members.push(newMember);
+            activityLog.unshift({ text: `Registered member '${newMember.name}'`, time: "Just now" });
+            renderAllViews();
+
+            try {
+                await fetch(`${API_BASE_URL}/api/members`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newMember)
+                });
+                showToast("Member synced to server!");
+            } catch (err) {
+                showToast("Member saved locally.");
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = 'Save Member';
+                closeModal('modal-add-member');
+            }
+        }
+
+        function switchTab(tabId) {
+            const views = ['dashboard', 'catalog', 'members', 'loans', 'reports', 'settings'];
+            views.forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                if (el) el.classList.add('hidden');
+                const nav = document.getElementById(`nav-${v}`);
+                if (nav) nav.className = "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all";
+            });
+
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            document.getElementById(`nav-${tabId}`).className = "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium bg-white text-zinc-950 shadow-sm transition-all";
+
+            const titles = { dashboard: 'Dashboard Overview', catalog: 'Book Inventory Catalog', members: 'Members Directory', loans: 'Circulation & Loans', reports: 'Reports & Analytics', settings: 'System Settings' };
+            document.getElementById('page-title').innerText = titles[tabId];
+
+            if (window.innerWidth < 768) {
+                toggleSidebar();
+            }
+        }
+
+        function logoutSession() {
+            const confirmed = confirm("Are you sure you want to sign out?");
+            if (confirmed) {
+                localStorage.removeItem('lms_session');
+                window.location.href = 'login.html';
+            }
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.classList.remove('translate-y-24', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-24', 'opacity-0'), 3000);
+        }
+    </script>
+</body>
+</html>
