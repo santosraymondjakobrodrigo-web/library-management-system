@@ -129,12 +129,18 @@ const response = await fetch('https://library-management-system-op5l.onrender.co
 
                 const data = await response.json();
 
-                if (response.ok) {
-                    localStorage.setItem('lms_session', JSON.stringify(data.user));
-                    showAlert('Login successful! Redirecting...', 'success');
-                    setTimeout(() => {
-                        window.location.href = 'lms.html';
-                    }, 800);
+
+if (response.ok && data.user) {
+    localStorage.setItem('lms_session', JSON.stringify(data.user));
+    showAlert('Login successful! Redirecting...', 'success');
+
+    setTimeout(() => {
+        window.location.href = 'lms.html';
+    }, 800);
+} else {
+    showAlert(data.message || 'Login failed. Please check your credentials.', 'error');
+}
+
                 } else {
                     showAlert(data.error || 'Invalid email address or password.', 'error');
                 }
