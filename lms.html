@@ -213,13 +213,25 @@
   // Frontend only. Data persistence and permissions must be implemented by the backend.
   const DEFAULT_API_BASE_URL = 'https://library-management-system-op5l.onrender.com';
   let API_BASE_URL = localStorage.getItem('lms_api_url') || DEFAULT_API_BASE_URL;
-  let activeSession = safeParse(localStorage.getItem('lms_session'));
 
-  // Redirect to login if no session exists.
-  if (!activeSession) {
-    window.location.replace('login.html');
+  function safeParse(value) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
   }
 
+  let activeSession = safeParse(localStorage.getItem('lms_session'));
+
+  if (
+    !activeSession ||
+    typeof activeSession !== 'object' ||
+    !activeSession.name
+  ) {
+    localStorage.removeItem('lms_session');
+    window.location.replace('login.html');
+  }
   let books = [], members = [], loans = [];
   let loansApiAvailable = false;
   let activityLog = [];
