@@ -1,95 +1,604 @@
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
 const app = express();
-
-
-app.use(express.json());
-app.use(cors());
-
-// Mag-serve ng static files (tulad ng login.html, lms.html, etc.) galing sa current folder
-app.use(express.static(path.join(__dirname)));
+const PORT = process.env.PORT || 3000;
 
 // ==========================================
-// MGA API ROUTES (Books & Members)
+// MIDDLEWARE
+// ==========================================
+app.use(cors());
+app.use(express.json({ limit: '1mb' }));
+
+// ==========================================
+// TEMPORARY IN-MEMORY STORAGE
+// Data resets when the server restarts.
 // ==========================================
 let books = [
-    { bookId: "101", title: "The Great King", author: "Luther", isbn: "LB-101", genre: "Classic Fiction", totalCopies: 5, availableCopies: 5, shelf: "A-01" }
+    {
+        bookId: '101',
+        title: 'The Great King',
+        author: 'Luther',
+        isbn: 'LB-101',
+        genre: 'Classic Fiction',
+        totalCopies: 5,
+        availableCopies: 5,
+        shelf: 'A-01'
+    }
 ];
 
 let members = [
-    { id: "M-001", name: "Juan Dela Cruz", email: "juan@example.com", status: "Active", fineBalance: 0.00 }
+    {
+        id: 'M-001',
+        name: 'Juan Dela Cruz',
+        email: 'juan@example.com',
+        status: 'Active',
+        fineBalance: 0
+    }
 ];
 
-// GET: 
+let loans = [];
+let users = [];
+
+let nextBookId = 102;
+let nextMemberId = 2;
+let nextLoanId = 1;
+
+// ==========================================
+// HELPER FUNCTIONS
+// ==========================================
+function today() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function isNonEmptyString(value) {
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+function findBook(id) {
+    return books.find(
+        book => String(book.bookId ?? book.id) === String(id)
+    );
+}
+
+function findMember(id) {
+    return members.find(
+        member => String(member.id ?? member.memberId) === String(id)
+    );
+}
+
+function findLoan(id) {
+    return loans.find(loan => String(loan.id) === String(id));
+}
+
+function getLoanResponse(loan) {
+    const isOverdue =
+        loan.status === 'Active' &&
+        loan.dueDate < today();
+
+    return {
+        ...loan,
+        status: loan.status === 'Returned'
+            ? 'Returned'
+            : isOverdue
+                ? 'Overdue'
+                : 'Active'
+    };
+}
+
+function validateBook(body, existingBook = null) {
+    const {
+        title,
+        author,
+        isbn,
+        genre,
+        shelf
+    } = body;
+
+    if (!isNonEmptyString(title)) {
+        return 'Book title is required.';
+    }
+
+    if (!isNonEmptyString(author)) {
+        return 'Author is required.';
+    }
+
+    const totalCopies = Number(
+        body.totalCopies ?? existingBook?.totalCopies ?? 1
+    );
+
+    if (!Number.isInteger(totalCopies) || totalCopies < 1) {
+        return 'Total copies must be a positive whole number.';
+    }
+
+    const duplicateISBN = isbn
+        ? books.find(book =>
+            String(book.isbn).toLowerCase() ===
+                String(isbn).trim().toLowerCase() &&
+            String(book.bookId ?? book.id) !==
+                String(existingBook?.bookId ?? existingBook?.id)
+        )
+        : null;
+
+    if (duplicateISBN) {
+        return 'A book with this ISBN already exists.';
+    }
+
+    return null;
+}
+
+// ==========================================
+// HEALTH CHECK
+// ==========================================
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        message: 'ARCHIVE LMS API is running.',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// ==========================================
+// BOOKS API
+// ==========================================
+
+// GET all books
 app.get('/api/books', (req, res) => {
     res.json(books);
 });
 
-// POST: 
-app.post('/api/books', (req, res) => {
-    const newBook = req.body;
-    books.push(newBook);
-    res.status(201).json({ message: "Book added successfully!", book: newBook });
+// GET one book
+app.get('/api/books/:id', (req, res) => {
+    const book = findBook(req.params.id);
+
+    if (!book) {
+        return res.status(404).json({
+            error: 'Book not found.'
+        });
+    }
+
+    res.json(book);
 });
 
-// GET: Kunin ang listahan ng mga members
+// ADD a book
+app.post('/api/books', (req, res) => {
+    const error = validateBook(req.body);
+
+    if (error) {
+        return res.status(400).json({ error });
+    }
+
+    const totalCopies = Number(req.body.totalCopies ?? 1);
+
+    const book = {
+        bookId: String(nextBookId++),
+        title: req.body.title.trim(),
+        author: req.body.author.trim(),
+        isbn: String(req.body.isbn ?? '').trim(),
+        genre: String(req.body.genre ?? 'Uncategorized').trim(),
+        totalCopies,
+        availableCopies: totalCopies,
+        shelf: String(req.body.shelf ?? '').trim()
+    };
+
+    books.push(book);
+
+    res.status(201).json({
+        message: 'Book added successfully.',
+        book
+    });
+});
+
+// EDIT an existing book
+app.put('/api/books/:id', (req, res) => {
+    const book = findBook(req.params.id);
+
+    if (!book) {
+        return res.status(404).json({
+            error: 'Book not found.'
+        });
+    }
+
+    const error = validateBook(req.body, book);
+
+    if (error) {
+        return res.status(400).json({ error });
+    }
+
+    // Count how many copies are currently on loan.
+    const checkedOut = loans.filter(loan =>
+        loan.bookId === String(book.bookId) &&
+        loan.status === 'Active'
+    ).length;
+
+    const totalCopies = Number(
+        req.body.totalCopies ?? book.totalCopies
+    );
+
+    if (totalCopies < checkedOut) {
+        return res.status(400).json({
+            error: `At least ${checkedOut} total copies are required because those copies are on loan.`
+        });
+    }
+
+    book.title = req.body.title.trim();
+    book.author = req.body.author.trim();
+    book.isbn = String(req.body.isbn ?? '').trim();
+    book.genre = String(req.body.genre ?? book.genre).trim();
+    book.shelf = String(req.body.shelf ?? book.shelf).trim();
+    book.totalCopies = totalCopies;
+    book.availableCopies = totalCopies - checkedOut;
+
+    res.json({
+        message: 'Book updated successfully.',
+        book
+    });
+});
+
+// ==========================================
+// MEMBERS API
+// ==========================================
+
+// GET all members
 app.get('/api/members', (req, res) => {
     res.json(members);
 });
 
-// POST: Mag-rehistro ng bagong member
+// GET one member
+app.get('/api/members/:id', (req, res) => {
+    const member = findMember(req.params.id);
+
+    if (!member) {
+        return res.status(404).json({
+            error: 'Member not found.'
+        });
+    }
+
+    res.json(member);
+});
+
+// REGISTER a member
 app.post('/api/members', (req, res) => {
-    const newMember = req.body;
-    members.push(newMember);
-    res.status(201).json({ message: "Member registered successfully!", member: newMember });
+    const { name, email } = req.body;
+
+    if (!isNonEmptyString(name)) {
+        return res.status(400).json({
+            error: 'Member name is required.'
+        });
+    }
+
+    if (!isNonEmptyString(email)) {
+        return res.status(400).json({
+            error: 'Member email is required.'
+        });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const duplicate = members.some(member =>
+        String(member.email).toLowerCase() === normalizedEmail
+    );
+
+    if (duplicate) {
+        return res.status(409).json({
+            error: 'A member with this email already exists.'
+        });
+    }
+
+    const member = {
+        id: `M-${String(nextMemberId++).padStart(3, '0')}`,
+        name: name.trim(),
+        email: normalizedEmail,
+        status: 'Active',
+        fineBalance: 0
+    };
+
+    members.push(member);
+
+    res.status(201).json({
+        message: 'Member registered successfully.',
+        member
+    });
 });
 
 // ==========================================
-// AUTHENTICATION API ROUTES (Login & Register)
+// LOANS API
 // ==========================================
-let users = []; // Temporary user storage
 
-// POST: Register bagong user
+// GET all loans
+app.get('/api/loans', (req, res) => {
+    res.json(loans.map(getLoanResponse));
+});
+
+// GET one loan
+app.get('/api/loans/:id', (req, res) => {
+    const loan = findLoan(req.params.id);
+
+    if (!loan) {
+        return res.status(404).json({
+            error: 'Loan not found.'
+        });
+    }
+
+    res.json(getLoanResponse(loan));
+});
+
+// CREATE a loan / borrow a book
+app.post('/api/loans', (req, res) => {
+    const {
+        memberId,
+        bookId,
+        borrowDate,
+        dueDate
+    } = req.body;
+
+    if (!memberId || !bookId || !borrowDate || !dueDate) {
+        return res.status(400).json({
+            error: 'Member, book, borrow date, and due date are required.'
+        });
+    }
+
+    if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(borrowDate) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) ||
+        Number.isNaN(Date.parse(borrowDate)) ||
+        Number.isNaN(Date.parse(dueDate))
+    ) {
+        return res.status(400).json({
+            error: 'Dates must use YYYY-MM-DD format.'
+        });
+    }
+
+    if (dueDate < borrowDate) {
+        return res.status(400).json({
+            error: 'Due date cannot be before the borrow date.'
+        });
+    }
+
+    const member = findMember(memberId);
+    const book = findBook(bookId);
+
+    if (!member) {
+        return res.status(404).json({
+            error: 'Member not found.'
+        });
+    }
+
+    if (member.status !== 'Active') {
+        return res.status(400).json({
+            error: 'This member is not active.'
+        });
+    }
+
+    if (!book) {
+        return res.status(404).json({
+            error: 'Book not found.'
+        });
+    }
+
+    if (Number(book.availableCopies) < 1) {
+        return res.status(400).json({
+            error: 'No available copies for this book.'
+        });
+    }
+
+    const loan = {
+        id: String(nextLoanId++),
+        memberId: String(member.id),
+        memberName: member.name,
+        bookId: String(book.bookId ?? book.id),
+        bookTitle: book.title,
+        borrowDate,
+        dueDate,
+        returnDate: null,
+        status: 'Active'
+    };
+
+    book.availableCopies = Number(book.availableCopies) - 1;
+    loans.push(loan);
+
+    res.status(201).json({
+        message: 'Loan created successfully.',
+        loan: getLoanResponse(loan)
+    });
+});
+
+// RETURN a borrowed book
+app.patch('/api/loans/:id/return', (req, res) => {
+    const loan = findLoan(req.params.id);
+
+    if (!loan) {
+        return res.status(404).json({
+            error: 'Loan not found.'
+        });
+    }
+
+    if (loan.status === 'Returned') {
+        return res.status(400).json({
+            error: 'This book has already been returned.'
+        });
+    }
+
+    const book = findBook(loan.bookId);
+
+    if (!book) {
+        return res.status(404).json({
+            error: 'Associated book not found.'
+        });
+    }
+
+    const returnDate = req.body?.returnDate || today();
+
+    if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(returnDate) ||
+        Number.isNaN(Date.parse(returnDate))
+    ) {
+        return res.status(400).json({
+            error: 'Return date must use YYYY-MM-DD format.'
+        });
+    }
+
+    loan.returnDate = returnDate;
+    loan.status = 'Returned';
+
+    book.availableCopies = Math.min(
+        Number(book.totalCopies),
+        Number(book.availableCopies) + 1
+    );
+
+    res.json({
+        message: 'Book returned successfully.',
+        loan: getLoanResponse(loan)
+    });
+});
+
+// ==========================================
+// AUTHENTICATION API
+// PROTOTYPE ONLY: passwords are NOT hashed.
+// ==========================================
+
+// REGISTER
 app.post('/api/register', (req, res) => {
     const { name, role, email, password } = req.body;
-    
-    // Check kung may existing user na
-    const existingUser = users.find(u => u.email === email);
-    if (existingUser) {
-        return res.status(400).json({ error: 'Email is already registered.' });
+
+    if (
+        !isNonEmptyString(name) ||
+        !isNonEmptyString(email) ||
+        !isNonEmptyString(password)
+    ) {
+        return res.status(400).json({
+            error: 'Name, email, and password are required.'
+        });
     }
 
-    const newUser = { name, role, email, password };
+    if (password.length < 8) {
+        return res.status(400).json({
+            error: 'Password must be at least 8 characters.'
+        });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const existingUser = users.find(
+        user => user.email === normalizedEmail
+    );
+
+    if (existingUser) {
+        return res.status(409).json({
+            error: 'Email is already registered.'
+        });
+    }
+
+    // Do not allow public registration to grant privileged roles.
+    const allowedRoles = ['Main Librarian', 'Librarian'];
+    const safeRole = allowedRoles.includes(role)
+        ? role
+        : 'Librarian';
+
+    const newUser = {
+        name: name.trim(),
+        role: safeRole,
+        email: normalizedEmail,
+        password
+    };
+
     users.push(newUser);
-    res.status(201).json({ message: "Account created successfully!", user: { name, role, email } });
+
+    res.status(201).json({
+        message: 'Account created successfully.',
+        user: {
+            name: newUser.name,
+            role: newUser.role,
+            email: newUser.email
+        }
+    });
 });
 
-// POST: Login user
+// LOGIN
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
-    
-    const user = users.find(u => u.email === email && u.password === password);
-    if (!user) {
-        return res.status(400).json({ error: 'Invalid email address or password.' });
+
+    if (!isNonEmptyString(email) || !isNonEmptyString(password)) {
+        return res.status(400).json({
+            error: 'Email and password are required.'
+        });
     }
 
-    res.json({ message: "Login successful!", user: { name: user.name, role: user.role, email: user.email } });
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const user = users.find(
+        u => u.email === normalizedEmail && u.password === password
+    );
+
+    if (!user) {
+        return res.status(401).json({
+            error: 'Invalid email address or password.'
+        });
+    }
+
+    res.json({
+        message: 'Login successful.',
+        user: {
+            name: user.name,
+            role: user.role,
+            email: user.email
+        }
+    });
 });
 
 // ==========================================
-// ROOT ROUTING 
+// FRONTEND ROUTING
 // ==========================================
+
+// Open login.html at the root URL.
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'login.html'));
 });
 
-// ==========================================
-// SERVER PORT CONFIGURATION (Cloud & Local Ready)
-// ==========================================
-const PORT = process.env.PORT || 3000;
+// Serve HTML, CSS, JS, and other frontend assets.
+app.use(express.static(__dirname));
 
+// ==========================================
+// ERROR HANDLING
+// ==========================================
+
+// Malformed JSON request body
+app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && 'body' in err) {
+        return res.status(400).json({
+            error: 'Invalid JSON request body.'
+        });
+    }
+
+    next(err);
+});
+
+// Unknown API endpoints
+app.use('/api', (req, res) => {
+    res.status(404).json({
+        error: `API route not found: ${req.method} ${req.originalUrl}`
+    });
+});
+
+// General fallback error handler
+app.use((err, req, res, next) => {
+    console.error('Server error:', err);
+
+    if (res.headersSent) {
+        return next(err);
+    }
+
+    res.status(500).json({
+        error: 'Internal server error.'
+    });
+});
+
+// ==========================================
+// START SERVER
+// ==========================================
 app.listen(PORT, () => {
-    console.log(`LMS Server is running and active on port ${PORT}`);
+    console.log(`ARCHIVE LMS running at http://localhost:${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
 });
