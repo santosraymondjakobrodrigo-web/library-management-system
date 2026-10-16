@@ -9,11 +9,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ==========================================
-// MONGODB ATLAS CONNECTION
+// MONGODB ATLAS
 // ==========================================
-let mongoClient;
-let db;
+let mongoClient = null;
+let db = null;
 let mongoConnected = false;
+let mongoConnecting = false;
 
 // ==========================================
 // MIDDLEWARE
@@ -23,9 +24,8 @@ app.use(express.json({ limit: '1mb' }));
 
 // ==========================================
 // TEMPORARY IN-MEMORY STORAGE
-// Records still reset when the server restarts.
-// MongoDB connection is added, but APIs still
-// need migration to make records persistent.
+// Existing APIs still use these arrays.
+// Database persistence is not yet implemented.
 // ==========================================
 let books = [
     {
@@ -65,7 +65,8 @@ function today() {
 }
 
 function isNonEmptyString(value) {
-    return typeof value === 'string' && value.trim().length > 0;
+    return typeof value === 'string' &&
+        value.trim().length > 0;
 }
 
 function findBook(id) {
@@ -81,7 +82,9 @@ function findMember(id) {
 }
 
 function findLoan(id) {
-    return loans.find(loan => String(loan.id) === String(id));
+    return loans.find(
+        loan => String(loan.id) === String(id)
+    );
 }
 
 function getLoanResponse(loan) {
@@ -183,7 +186,9 @@ app.post('/api/books', (req, res) => {
         title: req.body.title.trim(),
         author: req.body.author.trim(),
         isbn: String(req.body.isbn ?? '').trim(),
-        genre: String(req.body.genre ?? 'Uncategorized').trim(),
+        genre: String(
+            req.body.genre ?? 'Uncategorized'
+        ).trim(),
         totalCopies,
         availableCopies: totalCopies,
         shelf: String(req.body.shelf ?? '').trim()
@@ -231,8 +236,12 @@ app.put('/api/books/:id', (req, res) => {
     book.title = req.body.title.trim();
     book.author = req.body.author.trim();
     book.isbn = String(req.body.isbn ?? '').trim();
-    book.genre = String(req.body.genre ?? book.genre).trim();
-    book.shelf = String(req.body.shelf ?? book.shelf).trim();
+    book.genre = String(
+        req.body.genre ?? book.genre
+    ).trim();
+    book.shelf = String(
+        req.body.shelf ?? book.shelf
+    ).trim();
     book.totalCopies = totalCopies;
     book.availableCopies = totalCopies - checkedOut;
 
@@ -462,7 +471,7 @@ app.patch('/api/loans/:id/return', (req, res) => {
 // ==========================================
 // AUTHENTICATION API
 // PROTOTYPE ONLY: passwords are NOT hashed.
-// Accounts are stored in memory and reset on restart.
+// Users are stored in memory and reset on restart.
 // ==========================================
 
 // REGISTER
@@ -497,7 +506,6 @@ app.post('/api/register', (req, res) => {
         });
     }
 
-    // Do not allow public registration to grant privileged roles.
     const allowedRoles = ['Main Librarian', 'Librarian'];
     const safeRole = allowedRoles.includes(role)
         ? role
@@ -535,7 +543,9 @@ app.post('/api/login', (req, res) => {
     const normalizedEmail = email.trim().toLowerCase();
 
     const user = users.find(
-        u => u.email === normalizedEmail && u.password === password
+        user =>
+            user.email === normalizedEmail &&
+            user.password === password
     );
 
     if (!user) {
@@ -557,11 +567,9 @@ app.post('/api/login', (req, res) => {
 // ==========================================
 // FRONTEND ROUTING
 // ==========================================
-
 const loginFile = path.join(__dirname, 'login.html');
 const dashboardFile = path.join(__dirname, 'lms.html');
 
-// Root URL: open login page.
 app.get('/', (req, res) => {
     if (!fs.existsSync(loginFile)) {
         return res.status(500).send(
@@ -572,7 +580,6 @@ app.get('/', (req, res) => {
     res.sendFile(loginFile);
 });
 
-// Explicit login route.
 app.get('/login.html', (req, res) => {
     if (!fs.existsSync(loginFile)) {
         return res.status(404).send(
@@ -583,7 +590,6 @@ app.get('/login.html', (req, res) => {
     res.sendFile(loginFile);
 });
 
-// Explicit dashboard route.
 app.get('/lms.html', (req, res) => {
     if (!fs.existsSync(dashboardFile)) {
         return res.status(404).send(
@@ -594,14 +600,11 @@ app.get('/lms.html', (req, res) => {
     res.sendFile(dashboardFile);
 });
 
-// Serve other frontend assets.
 app.use(express.static(__dirname));
 
 // ==========================================
 // ERROR HANDLING
 // ==========================================
-
-// Malformed JSON request body.
 app.use((err, req, res, next) => {
     if (err instanceof SyntaxError && 'body' in err) {
         return res.status(400).json({
@@ -612,14 +615,12 @@ app.use((err, req, res, next) => {
     next(err);
 });
 
-// Unknown API endpoints.
 app.use('/api', (req, res) => {
     res.status(404).json({
         error: `API route not found: ${req.method} ${req.originalUrl}`
     });
 });
 
-// General fallback error handler.
 app.use((err, req, res, next) => {
     console.error('Server error:', err);
 
@@ -633,45 +634,64 @@ app.use((err, req, res, next) => {
 });
 
 // ==========================================
-// START SERVER + MONGODB CONNECTION
+// START SERVER
+// Start HTTP server even if Atlas is unavailable.
 // ==========================================
-async function startServer() {
+app.listen(PORT, () => {
+    console.log(`ARCHIVE LMS running on port ${PORT}`);
+    console.log('Health check: /api/health');
+});
+
+// ==========================================
+// CONNECT TO MONGODB IN BACKGROUND
+// ==========================================
+async function connectMongoDB() {
+    if (mongoConnecting || mongoConnected) {
+        return;
+    }
+
+    const mongoURI = process.env.MONGODB_URI;
+
+    if (!mongoURI) {
+        console.error(
+            'MongoDB not connected: MONGODB_URI is missing from Render Environment.'
+        );
+        return;
+    }
+
+    mongoConnecting = true;
+
     try {
-        const mongoURI = process.env.MONGODB_URI;
-
-        if (!mongoURI) {
-            throw new Error(
-                'MONGODB_URI is missing from Render Environment.'
-            );
-        }
-
-        mongoClient = new MongoClient(mongoURI);
+        mongoClient = new MongoClient(mongoURI, {
+            serverSelectionTimeoutMS: 10000
+        });
 
         await mongoClient.connect();
 
-        db = mongoClient.db('lms');
+        const database = mongoClient.db('lms');
+        await database.command({ ping: 1 });
 
-        // Verify that the database connection responds.
-        await db.command({ ping: 1 });
-
+        db = database;
         mongoConnected = true;
 
         console.log('MongoDB Atlas connected successfully.');
-
-        app.listen(PORT, () => {
-            console.log(`ARCHIVE LMS running on port ${PORT}`);
-            console.log('Health check: /api/health');
-        });
+        console.log('Database selected: lms');
     } catch (error) {
         mongoConnected = false;
-        console.error('Startup failed:', error.message);
+        db = null;
+
+        console.error(
+            'MongoDB connection failed:',
+            error.message
+        );
 
         if (mongoClient) {
             await mongoClient.close().catch(() => {});
+            mongoClient = null;
         }
-
-        process.exit(1);
+    } finally {
+        mongoConnecting = false;
     }
 }
 
-startServer();
+connectMongoDB();
