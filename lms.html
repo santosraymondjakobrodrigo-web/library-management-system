@@ -1,492 +1,551 @@
-<!DOCTYPE html>
-<html lang="en" class="h-full bg-zinc-100">
+from pathlib import Path
+
+html = r'''<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-100">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Library Management System - Responsive</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'monospace'],
-                    },
-                }
-            }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>ARCHIVE LMS — Library Management</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+          colors: { brand: { 50:'#eff6ff', 100:'#dbeafe', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' } },
+          boxShadow: { soft: '0 8px 30px rgba(15,23,42,.06)' }
         }
-    </script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 9999px; }
-        ::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
-    </style>
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+    .nav-link { transition: .18s ease; }
+    .nav-link.active { background: #eff6ff; color: #1d4ed8; box-shadow: inset 3px 0 #3b82f6; }
+    .nav-link:not(.active):hover { background: #f8fafc; color: #0f172a; }
+    .modal { animation: fadeIn .15s ease-out; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:translateY(0) } }
+    .field { width:100%; border:1px solid #e2e8f0; border-radius:.7rem; padding:.65rem .8rem; outline:none; background:white; }
+    .field:focus { border-color:#60a5fa; box-shadow:0 0 0 3px rgba(59,130,246,.12); }
+    .btn { border-radius:.7rem; padding:.62rem .9rem; font-size:.8rem; font-weight:600; transition:.15s ease; }
+    .btn-primary { background:#1d4ed8; color:white; } .btn-primary:hover { background:#1e40af; }
+    .btn-secondary { background:white; border:1px solid #e2e8f0; color:#334155; } .btn-secondary:hover { background:#f8fafc; }
+    .table-wrap { overflow-x:auto; }
+    .status { display:inline-flex; align-items:center; border-radius:999px; padding:.22rem .55rem; font-size:10px; font-weight:700; white-space:nowrap; }
+    .status-green { background:#dcfce7; color:#166534; } .status-blue { background:#dbeafe; color:#1d4ed8; }
+    .status-amber { background:#fef3c7; color:#92400e; } .status-red { background:#fee2e2; color:#991b1b; } .status-gray { background:#f1f5f9; color:#475569; }
+    .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  </style>
 </head>
-<body class="h-full font-sans text-zinc-900 antialiased overflow-hidden selection:bg-zinc-900 selection:text-white">
-
-    <div class="flex h-screen w-screen bg-zinc-950 overflow-hidden relative">
-
-        <!-- ================= MOBILE SIDEBAR BACKDROP ================= -->
-        <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-20 hidden md:hidden"></div>
-
-        <!-- ================= SIDEBAR ================= -->
-        <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 bg-zinc-950 text-zinc-400 flex flex-col justify-between border-r border-zinc-800/80 transition-transform duration-300 transform -translate-x-full md:translate-x-0 z-30 select-none shrink-0">
-            <div class="p-5 flex flex-col gap-6">
-                <div class="flex items-center justify-between px-2">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-white text-zinc-950 flex items-center justify-center font-bold text-sm shadow-sm">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                        </div>
-                        <div>
-                            <h1 class="font-semibold text-white tracking-tight text-sm">ARCHIVE LMS</h1>
-                            <p class="text-[10px] text-zinc-500 font-mono">REMOTE SYNC</p>
-                        </div>
-                    </div>
-                    <button onclick="toggleSidebar()" class="md:hidden text-zinc-400 hover:text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                </div>
-
-                <div class="bg-zinc-900/80 border border-zinc-800/60 rounded-xl p-3 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div id="sidebar-initials" class="w-8 h-8 rounded-full bg-zinc-800 text-zinc-200 font-medium text-xs flex items-center justify-center border border-zinc-700">AD</div>
-                        <div>
-                            <p id="sidebar-name" class="text-xs font-medium text-zinc-200">System Admin</p>
-                            <p id="sidebar-role" class="text-[10px] text-zinc-500">Main Librarian</p>
-                        </div>
-                    </div>
-                </div>
-
-                <nav class="space-y-1">
-                    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium bg-white text-zinc-950 shadow-sm transition-all">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                        <span>Dashboard</span>
-                    </button>
-                    <button onclick="switchTab('catalog')" id="nav-catalog" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                        <span>Catalog</span>
-                    </button>
-                    <button onclick="switchTab('members')" id="nav-members" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                        <span>Members</span>
-                    </button>
-                    <button onclick="switchTab('loans')" id="nav-loans" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                        <span>Circulation & Loans</span>
-                    </button>
-                    <button onclick="switchTab('reports')" id="nav-reports" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                        <span>Reports & Analytics</span>
-                    </button>
-                    <button onclick="switchTab('settings')" id="nav-settings" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        <span>System Settings</span>
-                    </button>
-                </nav>
-            </div>
-
-            <div class="p-5 border-t border-zinc-800/80">
-                <button onclick="logoutSession()" class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-800 transition-all">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                    <span>Sign Out</span>
-                </button>
-            </div>
-        </aside>
-
-        <!-- ================= MAIN CONTENT AREA ================= -->
-        <main class="flex-1 flex flex-col bg-white md:rounded-l-2xl shadow-2xl overflow-hidden border-l border-zinc-800 w-full">
-            <header class="h-16 border-b border-zinc-200 px-4 md:px-6 flex items-center justify-between bg-white shrink-0">
-                <div class="flex items-center gap-3">
-                    <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-lg bg-zinc-100 text-zinc-800 hover:bg-zinc-200">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                    </button>
-                    <h2 id="page-title" class="font-semibold text-zinc-900 text-sm md:text-base tracking-tight truncate">Dashboard Overview</h2>
-                </div>
-
-                <div class="flex items-center gap-2 md:gap-3">
-                    <button onclick="loadDataFromDatabase()" class="hidden sm:block px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-xl text-xs font-medium transition-all">🔄 Sync</button>
-                    <button onclick="openModal('modal-add-book')" class="px-3 py-1.5 bg-zinc-900 text-white rounded-xl text-xs font-medium hover:bg-zinc-800 transition-all shadow-sm">+ Add Book</button>
-                    <div class="flex items-center gap-2.5 pl-1">
-                        <div id="header-initials" class="w-8 h-8 rounded-full bg-zinc-900 text-white font-medium text-xs flex items-center justify-center shadow-sm">AD</div>
-                    </div>
-                </div>
-            </header>
-
-            <div id="content-viewport" class="flex-1 overflow-y-auto p-4 md:p-6 bg-zinc-50/50">
-                
-                <!-- DASHBOARD VIEW -->
-                <div id="view-dashboard" class="space-y-6 max-w-7xl mx-auto">
-                    <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-                        <div class="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm">
-                            <span class="text-[10px] md:text-[11px] font-semibold text-zinc-500 uppercase">Total Titles</span>
-                            <h3 id="stat-total-books" class="text-xl md:text-2xl font-bold text-zinc-900 mt-2">0</h3>
-                        </div>
-                        <div class="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm">
-                            <span class="text-[10px] md:text-[11px] font-semibold text-zinc-500 uppercase">Active Members</span>
-                            <h3 id="stat-active-members" class="text-xl md:text-2xl font-bold text-zinc-900 mt-2">0</h3>
-                        </div>
-                        <div class="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm">
-                            <span class="text-[10px] md:text-[11px] font-semibold text-zinc-500 uppercase">Checked Out</span>
-                            <h3 id="stat-checked-out" class="text-xl md:text-2xl font-bold text-zinc-900 mt-2">0</h3>
-                        </div>
-                        <div class="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm">
-                            <span class="text-[10px] md:text-[11px] font-semibold text-zinc-500 uppercase">Overdue Items</span>
-                            <h3 id="stat-overdue" class="text-xl md:text-2xl font-bold text-zinc-900 mt-2">0</h3>
-                        </div>
-                        <div class="col-span-2 sm:col-span-1 bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm">
-                            <span class="text-[10px] md:text-[11px] font-semibold text-zinc-500 uppercase">Pending Fines</span>
-                            <h3 id="stat-pending-fines" class="text-xl md:text-2xl font-bold text-zinc-900 mt-2">$0.00</h3>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div class="lg:col-span-2 bg-white p-4 md:p-6 rounded-2xl border border-zinc-200 shadow-sm">
-                            <h3 class="font-bold text-zinc-900 text-sm mb-4">Recent Activity Log</h3>
-                            <div id="activity-log-list" class="divide-y divide-zinc-100 max-h-[300px] overflow-y-auto"></div>
-                        </div>
-                        <div class="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200 shadow-sm space-y-3">
-                            <h3 class="font-bold text-zinc-900 text-sm">Quick Terminal</h3>
-                            <button onclick="openModal('modal-add-book')" class="w-full p-2.5 bg-zinc-50 hover:bg-zinc-900 hover:text-white rounded-xl border text-xs font-medium transition-all">+ Add Book</button>
-                            <button onclick="openModal('modal-add-member')" class="w-full p-2.5 bg-zinc-50 hover:bg-zinc-900 hover:text-white rounded-xl border text-xs font-medium transition-all">+ Register Member</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- CATALOG VIEW -->
-                <div id="view-catalog" class="space-y-6 max-w-7xl mx-auto hidden">
-                    <div class="flex justify-between items-center">
-                        <h3 class="font-bold text-zinc-900 text-base md:text-lg">Book Inventory Catalog</h3>
-                        <button onclick="openModal('modal-add-book')" class="px-3 md:px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs">+ Add Book</button>
-                    </div>
-                    <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-x-auto">
-                        <table class="w-full text-left text-xs whitespace-nowrap">
-                            <thead class="bg-zinc-100 text-zinc-600 uppercase text-[10px] border-b">
-                                <tr>
-                                    <th class="p-4">Title & Author</th>
-                                    <th class="p-4">ISBN</th>
-                                    <th class="p-4">Genre</th>
-                                    <th class="p-4">Shelf</th>
-                                    <th class="p-4">Copies (Avail/Total)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="catalog-table-body" class="divide-y divide-zinc-200"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- MEMBERS VIEW -->
-                <div id="view-members" class="space-y-6 max-w-7xl mx-auto hidden">
-                    <div class="flex justify-between items-center">
-                        <h3 class="font-bold text-zinc-900 text-base md:text-lg">Members Directory</h3>
-                        <button onclick="openModal('modal-add-member')" class="px-3 md:px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs">+ Add Member</button>
-                    </div>
-                    <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-x-auto">
-                        <table class="w-full text-left text-xs whitespace-nowrap">
-                            <thead class="bg-zinc-100 text-zinc-600 uppercase text-[10px] border-b">
-                                <tr>
-                                    <th class="p-4">Member Name</th>
-                                    <th class="p-4">ID</th>
-                                    <th class="p-4">Email</th>
-                                    <th class="p-4">Status</th>
-                                    <th class="p-4">Fine Balance</th>
-                                </tr>
-                            </thead>
-                            <tbody id="members-table-body" class="divide-y divide-zinc-200"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- LOANS VIEW -->
-                <div id="view-loans" class="space-y-6 max-w-7xl mx-auto hidden">
-                    <h3 class="font-bold text-zinc-900 text-lg">Circulation & Loans</h3>
-                    <div class="bg-white p-6 rounded-2xl border shadow-sm text-xs text-zinc-500">Circulation records active.</div>
-                </div>
-
-                <!-- REPORTS VIEW -->
-                <div id="view-reports" class="space-y-6 max-w-7xl mx-auto hidden">
-                    <h3 class="font-bold text-zinc-900 text-lg">Reports & Analytics</h3>
-                    <div class="bg-white p-6 rounded-2xl border shadow-sm text-xs">Total synchronized database entries: <span id="rep-total" class="font-bold font-mono">0</span></div>
-                </div>
-
-                <!-- SETTINGS VIEW -->
-                <div id="view-settings" class="space-y-6 max-w-7xl mx-auto hidden">
-                    <h3 class="font-bold text-zinc-900 text-lg">System Settings</h3>
-                    <div class="bg-white p-6 rounded-2xl border shadow-sm max-w-xl text-xs space-y-3">
-                        <label class="font-bold">Active API Endpoint URL</label>
-                        <input type="text" id="setting-api-url" class="w-full p-2 bg-zinc-50 border rounded-lg font-mono" placeholder="http://localhost:3000">
-                        <button onclick="saveApiUrlSetting()" class="px-4 py-2 bg-zinc-900 text-white rounded-lg text-xs font-medium">Update & Reconnect</button>
-                    </div>
-                </div>
-
-            </div>
-        </main>
+<body class="h-full font-sans text-slate-800 antialiased">
+<div class="min-h-screen bg-slate-100">
+  <div id="sidebar-backdrop" class="fixed inset-0 z-30 hidden bg-slate-950/40 md:hidden" onclick="toggleSidebar(false)"></div>
+  <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform duration-200 md:translate-x-0">
+    <div class="flex h-20 items-center gap-3 border-b border-slate-100 px-6">
+      <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-soft">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 5.5v16M8 7h8M8 11h8"/></svg>
+      </div>
+      <div><div class="text-sm font-extrabold tracking-tight text-slate-900">ARCHIVE <span class="text-blue-600">LMS</span></div><div class="mt-0.5 text-[10px] font-semibold uppercase tracking-[.18em] text-slate-400">Library workspace</div></div>
     </div>
+    <div class="px-4 py-5">
+      <div class="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Workspace</div>
+      <nav class="space-y-1">
+        <button class="nav-link active flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold" data-view="dashboard" onclick="switchTab('dashboard')"><span>◫</span> Overview</button>
+        <button class="nav-link flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-500" data-view="catalog" onclick="switchTab('catalog')"><span>▤</span> Book catalog <span id="nav-books-count" class="ml-auto rounded-md bg-slate-100 px-2 py-0.5 text-[10px]">0</span></button>
+        <button class="nav-link flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-500" data-view="members" onclick="switchTab('members')"><span>♙</span> Members</button>
+        <button class="nav-link flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-500" data-view="loans" onclick="switchTab('loans')"><span>⇄</span> Circulation & loans <span id="nav-loans-count" class="ml-auto rounded-md bg-slate-100 px-2 py-0.5 text-[10px]">0</span></button>
+        <button class="nav-link flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-500" data-view="reports" onclick="switchTab('reports')"><span>▥</span> Analytics & reports</button>
+      </nav>
+      <div class="mb-2 mt-8 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">System</div>
+      <button class="nav-link flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-500" data-view="settings" onclick="switchTab('settings')"><span>⚙</span> Settings</button>
+    </div>
+    <div class="mt-auto border-t border-slate-100 p-4">
+      <div class="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+        <div id="sidebar-initials" class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">SA</div>
+        <div class="min-w-0 flex-1"><div id="sidebar-name" class="truncate text-xs font-bold text-slate-800">System Admin</div><div id="sidebar-role" class="mt-0.5 truncate text-[10px] text-slate-500">Main Librarian</div></div>
+        <button onclick="logoutSession()" title="Sign out" class="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700">↗</button>
+      </div>
+    </div>
+  </aside>
 
-    <!-- MODALS -->
-    <div id="modal-add-book" class="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white w-full max-w-md rounded-2xl border shadow-2xl p-6 space-y-4 text-xs max-h-[90vh] overflow-y-auto">
-            <h3 class="font-bold text-sm border-b pb-2">Add Book</h3>
-            <form id="form-add-book" onsubmit="handleSaveBook(event)" class="space-y-3">
-                <div><label class="font-semibold text-zinc-700">Book ID *</label><input type="text" id="book-input-id" value="101" required class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
-                <div><label class="font-semibold text-zinc-700">Title *</label><input type="text" id="book-input-title" value="The Great King" required class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
-                <div><label class="font-semibold text-zinc-700">Author *</label><input type="text" id="book-input-author" value="Luther" required class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
-                <div><label class="font-semibold text-zinc-700">ISBN *</label><input type="text" id="book-input-isbn" value="LB-101" required class="w-full p-2 border rounded-lg font-mono mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
-                <div><label class="font-semibold text-zinc-700">Genre</label><input type="text" id="book-input-genre" value="Classic Fiction" class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div><label class="font-semibold text-zinc-700">Total Copies</label><input type="number" id="book-input-copies" value="5" class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
-                    <div><label class="font-semibold text-zinc-700">Shelf</label><input type="text" id="book-input-shelf" value="A-01" class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
-                </div>
-                <div class="flex justify-end gap-2 pt-3">
-                    <button type="button" onclick="closeModal('modal-add-book')" class="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 rounded-lg text-zinc-800 font-medium transition-all">Cancel</button>
-                    <button type="submit" id="btn-submit-book" class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg font-medium transition-all shadow-sm">Save Book</button>
-                </div>
-            </form>
+  <main class="min-h-screen md:pl-64">
+    <header class="sticky top-0 z-20 flex min-h-[76px] items-center justify-between gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8">
+      <div class="flex min-w-0 items-center gap-3">
+        <button onclick="toggleSidebar()" class="rounded-lg border border-slate-200 p-2 text-slate-600 md:hidden" aria-label="Open navigation">☰</button>
+        <div class="min-w-0"><p class="text-[10px] font-bold uppercase tracking-[.15em] text-blue-600">Library operations</p><h1 id="page-title" class="truncate text-lg font-extrabold tracking-tight text-slate-900">Overview</h1></div>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="relative hidden sm:block">
+          <span class="pointer-events-none absolute left-3 top-2.5 text-slate-400">⌕</span>
+          <input id="global-search" class="field w-48 py-2 pl-9 text-xs md:w-64" placeholder="Search books, members..." oninput="handleGlobalSearch(this.value)" onkeydown="if(event.key==='Enter')runGlobalSearch()" aria-label="Global search" />
+          <div id="global-search-results" class="absolute right-0 top-11 z-30 hidden max-h-80 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl"></div>
         </div>
-    </div>
+        <button onclick="loadDataFromDatabase(true)" class="btn btn-secondary hidden sm:inline-flex items-center gap-2"><span>↻</span> Sync</button>
+        <button onclick="openModal('modal-add-book')" class="btn btn-primary inline-flex items-center gap-1.5"><span class="text-base">+</span><span class="hidden sm:inline">Add book</span><span class="sm:hidden">Add</span></button>
+      </div>
+    </header>
 
-    <div id="modal-add-member" class="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white w-full max-w-md rounded-2xl border shadow-2xl p-6 space-y-4 text-xs max-h-[90vh] overflow-y-auto">
-            <h3 class="font-bold text-sm border-b pb-2">Register Member</h3>
-            <form id="form-add-member" onsubmit="handleSaveMember(event)" class="space-y-3">
-                <div><label class="font-semibold text-zinc-700">Member ID *</label><input type="text" id="member-input-id" required class="w-full p-2 border rounded-lg font-mono mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
-                <div><label class="font-semibold text-zinc-700">Full Name *</label><input type="text" id="member-input-name" required class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
-                <div><label class="font-semibold text-zinc-700">Email *</label><input type="email" id="member-input-email" required class="w-full p-2 border rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-zinc-900"></div>
-                <div class="flex justify-end gap-2 pt-3">
-                    <button type="button" onclick="closeModal('modal-add-member')" class="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 rounded-lg text-zinc-800 font-medium transition-all">Cancel</button>
-                    <button type="submit" id="btn-submit-member" class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg font-medium transition-all shadow-sm">Save Member</button>
-                </div>
-            </form>
+    <div id="content-viewport" class="mx-auto max-w-[1600px] space-y-6 p-4 md:p-8">
+      <section id="view-dashboard" class="view space-y-6">
+        <div class="flex flex-col justify-between gap-2 sm:flex-row sm:items-end"><div><h2 class="text-xl font-extrabold tracking-tight text-slate-900">Good day, <span id="welcome-name">Librarian</span></h2><p class="mt-1 text-sm text-slate-500">Here’s what’s happening in your library today.</p></div><p id="today-label" class="text-xs font-medium text-slate-400"></p></div>
+        <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft"><div class="flex items-center justify-between"><span class="text-xs font-semibold text-slate-500">Book titles</span><span class="rounded-lg bg-blue-50 p-2 text-blue-600">▤</span></div><div id="stat-total-books" class="mt-3 text-3xl font-extrabold tracking-tight">0</div><div id="stat-total-copies" class="mt-1 text-[11px] text-slate-400">0 total copies</div></div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft"><div class="flex items-center justify-between"><span class="text-xs font-semibold text-slate-500">Members</span><span class="rounded-lg bg-violet-50 p-2 text-violet-600">♙</span></div><div id="stat-members" class="mt-3 text-3xl font-extrabold tracking-tight">0</div><div class="mt-1 text-[11px] text-slate-400">Registered member records</div></div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft"><div class="flex items-center justify-between"><span class="text-xs font-semibold text-slate-500">Active loans</span><span class="rounded-lg bg-amber-50 p-2 text-amber-600">⇄</span></div><div id="stat-loans" class="mt-3 text-3xl font-extrabold tracking-tight">—</div><div id="loans-subtitle" class="mt-1 text-[11px] text-slate-400">Requires loans API</div></div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft"><div class="flex items-center justify-between"><span class="text-xs font-semibold text-slate-500">Overdue loans</span><span class="rounded-lg bg-rose-50 p-2 text-rose-600">!</span></div><div id="stat-overdue" class="mt-3 text-3xl font-extrabold tracking-tight">—</div><div class="mt-1 text-[11px] text-slate-400">Calculated from due dates</div></div>
         </div>
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft xl:col-span-2">
+            <div class="flex flex-wrap items-start justify-between gap-2"><div><h3 class="font-bold text-slate-900">Borrowing activity</h3><p class="mt-1 text-xs text-slate-500">Monthly loan records returned by the API</p></div><span id="chart-status" class="status status-gray">Awaiting data</span></div>
+            <div id="activity-chart" class="mt-5 flex h-52 items-end gap-3 border-b border-slate-100 pb-2"><div class="m-auto max-w-xs text-center text-xs leading-5 text-slate-400">Connect a loans endpoint with borrowing dates to display activity. No sample metrics are being invented.</div></div>
+            <div id="chart-month-labels" class="mt-2 flex justify-between text-[10px] font-medium text-slate-400"></div>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
+            <div class="flex items-center justify-between"><div><h3 class="font-bold text-slate-900">Inventory availability</h3><p class="mt-1 text-xs text-slate-500">Based on available and total copies</p></div><span class="rounded-lg bg-emerald-50 p-2 text-emerald-600">◉</span></div>
+            <div id="inventory-summary" class="mt-5 space-y-4"><p class="text-xs text-slate-400">No inventory records loaded.</p></div>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft xl:col-span-2">
+            <div class="flex items-center justify-between"><div><h3 class="font-bold text-slate-900">Recent activity</h3><p class="mt-1 text-xs text-slate-500">Actions recorded during this browser session</p></div><button onclick="clearActivity()" class="text-xs font-semibold text-slate-400 hover:text-slate-700">Clear</button></div>
+            <div id="activity-log-list" class="mt-4 divide-y divide-slate-100"><p class="py-5 text-center text-xs text-slate-400">No activity yet.</p></div>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft"><h3 class="font-bold text-slate-900">Quick actions</h3><p class="mt-1 text-xs text-slate-500">Common librarian tasks</p><div class="mt-4 space-y-2"><button onclick="openModal('modal-add-book')" class="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-blue-200 hover:bg-blue-50/50"><span class="rounded-lg bg-blue-50 p-2 text-blue-700">＋</span><span><b class="block text-xs">Add a book</b><small class="text-[10px] text-slate-500">Create a catalog record</small></span><span class="ml-auto text-slate-400">→</span></button><button onclick="openModal('modal-add-member')" class="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-blue-200 hover:bg-blue-50/50"><span class="rounded-lg bg-violet-50 p-2 text-violet-700">♙</span><span><b class="block text-xs">Register member</b><small class="text-[10px] text-slate-500">Add a library member</small></span><span class="ml-auto text-slate-400">→</span></button><button onclick="switchTab('loans');openModal('modal-loan')" class="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-blue-200 hover:bg-blue-50/50"><span class="rounded-lg bg-amber-50 p-2 text-amber-700">⇄</span><span><b class="block text-xs">Issue a book</b><small class="text-[10px] text-slate-500">Create a borrowing record</small></span><span class="ml-auto text-slate-400">→</span></button></div></div>
+        </div>
+      </section>
+
+      <section id="view-catalog" class="view hidden space-y-5">
+        <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><h2 class="text-xl font-extrabold tracking-tight text-slate-900">Book catalog</h2><p class="mt-1 text-sm text-slate-500">Manage titles, copies, classification, and availability.</p></div><div class="flex gap-2"><button onclick="exportTableCSV('catalog')" class="btn btn-secondary">↓ Export CSV</button><button onclick="openModal('modal-add-book')" class="btn btn-primary">+ Add book</button></div></div>
+        <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft lg:flex-row lg:items-center">
+          <div class="relative flex-1"><span class="absolute left-3 top-2.5 text-slate-400">⌕</span><input id="catalog-search" class="field pl-9 text-sm" placeholder="Search title, author, ISBN or book ID..." oninput="renderCatalog()"></div>
+          <select id="catalog-genre" class="field text-sm lg:w-48" onchange="renderCatalog()"><option value="">All genres</option></select>
+          <select id="catalog-availability" class="field text-sm lg:w-44" onchange="renderCatalog()"><option value="">All availability</option><option value="available">Available</option><option value="unavailable">Unavailable</option></select>
+          <select id="catalog-sort" class="field text-sm lg:w-44" onchange="renderCatalog()"><option value="title">Sort: Title A–Z</option><option value="title-desc">Title Z–A</option><option value="copies">Most copies</option></select>
+        </div>
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft">
+          <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4"><span id="catalog-result-count" class="text-xs font-semibold text-slate-500">0 records</span><span class="text-[10px] text-slate-400">Catalog records from API</span></div>
+          <div class="table-wrap"><table class="w-full min-w-[850px] text-left text-sm"><thead class="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3">Book</th><th class="px-4 py-3">ISBN / ID</th><th class="px-4 py-3">Genre</th><th class="px-4 py-3">Shelf</th><th class="px-4 py-3">Availability</th><th class="px-5 py-3 text-right">Actions</th></tr></thead><tbody id="catalog-table-body" class="divide-y divide-slate-100"></tbody></table></div>
+          <div id="catalog-empty" class="hidden px-5 py-14 text-center"><div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-xl">▤</div><p class="font-bold text-slate-700">No books found</p><p class="mt-1 text-xs text-slate-400">Try changing your search or add a book to the catalog.</p></div>
+        </div>
+      </section>
+
+      <section id="view-members" class="view hidden space-y-5">
+        <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><h2 class="text-xl font-extrabold tracking-tight">Members directory</h2><p class="mt-1 text-sm text-slate-500">Registered library members and account status.</p></div><div class="flex gap-2"><button onclick="exportTableCSV('members')" class="btn btn-secondary">↓ Export CSV</button><button onclick="openModal('modal-add-member')" class="btn btn-primary">+ Register member</button></div></div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft"><input id="members-search" class="field text-sm" placeholder="Search name, member ID or email..." oninput="renderMembers()"></div>
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft"><div class="table-wrap"><table class="w-full min-w-[720px] text-left text-sm"><thead class="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3">Member</th><th class="px-4 py-3">Member ID</th><th class="px-4 py-3">Email</th><th class="px-4 py-3">Status</th><th class="px-5 py-3 text-right">Actions</th></tr></thead><tbody id="members-table-body" class="divide-y divide-slate-100"></tbody></table></div><div id="members-empty" class="hidden px-5 py-14 text-center text-xs text-slate-400">No matching members.</div></div>
+      </section>
+
+      <section id="view-loans" class="view hidden space-y-5">
+        <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><h2 class="text-xl font-extrabold tracking-tight">Circulation & loans</h2><p class="mt-1 text-sm text-slate-500">Issue books, monitor due dates, and process returns.</p></div><div class="flex gap-2"><button onclick="exportTableCSV('loans')" class="btn btn-secondary">↓ Export CSV</button><button onclick="openModal('modal-loan')" class="btn btn-primary">+ Issue book</button></div></div>
+        <div id="loans-api-warning" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><b>Loans API not verified.</b> This module needs backend endpoints and a defined loan data shape. The frontend will not invent loan records.</div>
+        <div class="grid grid-cols-2 gap-3 xl:grid-cols-4"><div class="rounded-2xl border border-slate-200 bg-white p-4"><p class="text-xs text-slate-500">Active loans</p><p id="loan-active-count" class="mt-2 text-2xl font-extrabold">—</p></div><div class="rounded-2xl border border-slate-200 bg-white p-4"><p class="text-xs text-slate-500">Overdue</p><p id="loan-overdue-count" class="mt-2 text-2xl font-extrabold text-rose-600">—</p></div><div class="rounded-2xl border border-slate-200 bg-white p-4"><p class="text-xs text-slate-500">Returned</p><p id="loan-returned-count" class="mt-2 text-2xl font-extrabold">—</p></div><div class="rounded-2xl border border-slate-200 bg-white p-4"><p class="text-xs text-slate-500">Due today</p><p id="loan-due-today-count" class="mt-2 text-2xl font-extrabold text-amber-600">—</p></div></div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft"><div class="flex flex-col gap-3 md:flex-row"><input id="loans-search" class="field flex-1 text-sm" placeholder="Search member, book or loan ID..." oninput="renderLoans()"><select id="loans-filter" class="field text-sm md:w-48" onchange="renderLoans()"><option value="">All loans</option><option value="active">Active</option><option value="overdue">Overdue</option><option value="returned">Returned</option></select></div></div>
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft"><div class="table-wrap"><table class="w-full min-w-[850px] text-left text-sm"><thead class="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3">Member / Book</th><th class="px-4 py-3">Borrowed</th><th class="px-4 py-3">Due date</th><th class="px-4 py-3">Status</th><th class="px-5 py-3 text-right">Action</th></tr></thead><tbody id="loans-table-body" class="divide-y divide-slate-100"></tbody></table></div><div id="loans-empty" class="hidden px-5 py-14 text-center text-xs text-slate-400">No loans match this filter, or the loans API is not connected.</div></div>
+      </section>
+
+      <section id="view-reports" class="view hidden space-y-5">
+        <div><h2 class="text-xl font-extrabold tracking-tight">Analytics & reports</h2><p class="mt-1 text-sm text-slate-500">Summaries derived from records returned by the API.</p></div>
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-2"><div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft"><h3 class="font-bold">Inventory composition</h3><p class="mt-1 text-xs text-slate-500">Total and available copies</p><div id="report-inventory" class="mt-5 space-y-4"></div></div><div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft"><h3 class="font-bold">Loan status breakdown</h3><p class="mt-1 text-xs text-slate-500">Only shown when loan records are available</p><div id="report-loans" class="mt-5 space-y-4"><p class="text-xs text-slate-400">Loans data unavailable.</p></div></div></div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft"><div class="flex flex-wrap items-center justify-between gap-3"><div><h3 class="font-bold">Report export</h3><p class="mt-1 text-xs text-slate-500">Download currently loaded records as CSV.</p></div><div class="flex flex-wrap gap-2"><button onclick="exportTableCSV('catalog')" class="btn btn-secondary">Export books</button><button onclick="exportTableCSV('members')" class="btn btn-secondary">Export members</button><button onclick="exportTableCSV('loans')" class="btn btn-secondary">Export loans</button></div></div><p class="mt-3 text-[11px] leading-5 text-slate-400">CSV export reflects records currently loaded in this browser. It is not a substitute for a server-generated full database report.</p></div>
+      </section>
+
+      <section id="view-settings" class="view hidden space-y-5">
+        <div><h2 class="text-xl font-extrabold tracking-tight">System settings</h2><p class="mt-1 text-sm text-slate-500">Configure the frontend API connection.</p></div>
+        <div class="max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-soft"><h3 class="font-bold">API connection</h3><p class="mt-1 text-xs leading-5 text-slate-500">Set the base URL of your backend. The server must implement the endpoints listed in the integration notes.</p><label for="setting-api-url" class="mt-5 block text-xs font-bold text-slate-600">API base URL</label><input id="setting-api-url" class="field mt-2 font-mono text-sm" placeholder="http://localhost:3000"><div class="mt-3 flex flex-wrap gap-2"><button onclick="saveApiUrlSetting()" class="btn btn-primary">Save & reconnect</button><button onclick="loadDataFromDatabase(true)" class="btn btn-secondary">Test connection</button></div><p id="connection-status" class="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">Connection status has not been checked.</p></div>
+        <div class="max-w-2xl rounded-2xl border border-blue-100 bg-blue-50/70 p-5"><h3 class="text-sm font-bold text-blue-900">Integration notes</h3><ul class="mt-3 list-disc space-y-2 pl-5 text-xs leading-5 text-blue-900/80"><li>Books and members use GET and POST endpoints compatible with the original frontend.</li><li>Loans use GET <code>/api/loans</code>, POST <code>/api/loans</code>, and PATCH <code>/api/loans/:id/return</code> as an expected contract. If these are not implemented, loans actions will show an error instead of claiming success.</li><li>Authentication, authorization, database transactions, and validation must be enforced by the backend.</li></ul></div>
+      </section>
     </div>
+  </main>
+</div>
 
-    <div id="toast" class="fixed bottom-6 right-6 bg-zinc-950 text-white px-4 py-3 rounded-xl shadow-2xl text-xs font-medium transform translate-y-24 opacity-0 transition-all duration-300 z-50">Action completed</div>
+<!-- Add/Edit Book modal -->
+<div id="modal-add-book" class="modal fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm">
+  <div class="my-auto w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+    <div class="flex items-start justify-between"><div><h3 id="book-modal-title" class="text-lg font-extrabold">Add book</h3><p class="mt-1 text-xs text-slate-500">Enter the catalog information below.</p></div><button onclick="closeModal('modal-add-book')" class="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Close">✕</button></div>
+    <form id="form-add-book" class="mt-5 space-y-4" onsubmit="handleSaveBook(event)">
+      <input id="book-original-id" type="hidden">
+      <div class="grid gap-4 sm:grid-cols-2"><div><label for="book-input-id" class="mb-1.5 block text-xs font-bold">Book ID <span class="text-rose-500">*</span></label><input id="book-input-id" class="field text-sm" required maxlength="80" placeholder="BK-001"></div><div><label for="book-input-isbn" class="mb-1.5 block text-xs font-bold">ISBN</label><input id="book-input-isbn" class="field text-sm" maxlength="40" placeholder="ISBN (optional)"></div></div>
+      <div><label for="book-input-title" class="mb-1.5 block text-xs font-bold">Title <span class="text-rose-500">*</span></label><input id="book-input-title" class="field text-sm" required maxlength="200" placeholder="Book title"></div>
+      <div class="grid gap-4 sm:grid-cols-2"><div><label for="book-input-author" class="mb-1.5 block text-xs font-bold">Author <span class="text-rose-500">*</span></label><input id="book-input-author" class="field text-sm" required maxlength="150" placeholder="Author name"></div><div><label for="book-input-genre" class="mb-1.5 block text-xs font-bold">Genre</label><input id="book-input-genre" class="field text-sm" maxlength="100" placeholder="Fiction, Science..."></div></div>
+      <div class="grid gap-4 sm:grid-cols-2"><div><label for="book-input-copies" class="mb-1.5 block text-xs font-bold">Total copies <span class="text-rose-500">*</span></label><input id="book-input-copies" type="number" min="1" step="1" value="1" class="field text-sm" required></div><div><label for="book-input-shelf" class="mb-1.5 block text-xs font-bold">Shelf / location</label><input id="book-input-shelf" class="field text-sm" placeholder="A-01"></div></div>
+      <p id="book-form-error" class="hidden rounded-lg bg-rose-50 p-3 text-xs text-rose-700"></p>
+      <div class="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onclick="closeModal('modal-add-book')" class="btn btn-secondary">Cancel</button><button id="btn-submit-book" type="submit" class="btn btn-primary">Save book</button></div>
+    </form>
+  </div>
+</div>
 
-    <!-- SCRIPT CONTROLLER WITH REMOTE / DYNAMIC API ROUTING -->
-    <script>
-        // Dynamic API Base URL Config (Nagbabago kung local o naka-ngrok/remote)
-        let API_BASE_URL = localStorage.getItem('lms_api_url') || 'http://localhost:3000';
+<!-- Add Member modal -->
+<div id="modal-add-member" class="modal fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm">
+  <div class="my-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+    <div class="flex items-start justify-between"><div><h3 class="text-lg font-extrabold">Register member</h3><p class="mt-1 text-xs text-slate-500">Create a member record.</p></div><button onclick="closeModal('modal-add-member')" class="rounded-lg p-2 text-slate-400 hover:bg-slate-100">✕</button></div>
+    <form id="form-add-member" class="mt-5 space-y-4" onsubmit="handleSaveMember(event)">
+      <div><label for="member-input-id" class="mb-1.5 block text-xs font-bold">Member ID <span class="text-rose-500">*</span></label><input id="member-input-id" class="field text-sm" required maxlength="80" placeholder="MB-001"></div>
+      <div><label for="member-input-name" class="mb-1.5 block text-xs font-bold">Full name <span class="text-rose-500">*</span></label><input id="member-input-name" class="field text-sm" required maxlength="150" placeholder="Full name"></div>
+      <div><label for="member-input-email" class="mb-1.5 block text-xs font-bold">Email <span class="text-rose-500">*</span></label><input id="member-input-email" type="email" class="field text-sm" required maxlength="254" placeholder="name@example.com"></div>
+      <p id="member-form-error" class="hidden rounded-lg bg-rose-50 p-3 text-xs text-rose-700"></p>
+      <div class="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onclick="closeModal('modal-add-member')" class="btn btn-secondary">Cancel</button><button id="btn-submit-member" type="submit" class="btn btn-primary">Save member</button></div>
+    </form>
+  </div>
+</div>
 
-        let activeSession = JSON.parse(localStorage.getItem('lms_session') || 'null');
-        if (!activeSession) {
-            activeSession = { name: "System Admin", role: "Main Librarian" };
-        }
+<!-- Issue loan modal -->
+<div id="modal-loan" class="modal fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm">
+  <div class="my-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+    <div class="flex items-start justify-between"><div><h3 class="text-lg font-extrabold">Issue a book</h3><p class="mt-1 text-xs text-slate-500">This action requires a working loans API.</p></div><button onclick="closeModal('modal-loan')" class="rounded-lg p-2 text-slate-400 hover:bg-slate-100">✕</button></div>
+    <form class="mt-5 space-y-4" onsubmit="handleIssueLoan(event)">
+      <div><label for="loan-member" class="mb-1.5 block text-xs font-bold">Member <span class="text-rose-500">*</span></label><select id="loan-member" class="field text-sm" required><option value="">Select member</option></select></div>
+      <div><label for="loan-book" class="mb-1.5 block text-xs font-bold">Available book <span class="text-rose-500">*</span></label><select id="loan-book" class="field text-sm" required><option value="">Select book</option></select></div>
+      <div class="grid gap-4 sm:grid-cols-2"><div><label for="loan-borrow-date" class="mb-1.5 block text-xs font-bold">Borrow date</label><input id="loan-borrow-date" type="date" class="field text-sm" required></div><div><label for="loan-due-date" class="mb-1.5 block text-xs font-bold">Due date</label><input id="loan-due-date" type="date" class="field text-sm" required></div></div>
+      <p id="loan-form-error" class="hidden rounded-lg bg-rose-50 p-3 text-xs text-rose-700"></p>
+      <div class="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onclick="closeModal('modal-loan')" class="btn btn-secondary">Cancel</button><button id="btn-submit-loan" type="submit" class="btn btn-primary">Issue book</button></div>
+    </form>
+  </div>
+</div>
 
-        let books = [];
-        let members = [];
-        let loans = [];
-        let activityLog = [{ text: "System initialized and ready", time: "Just now" }];
+<div id="toast" role="status" aria-live="polite" class="fixed bottom-5 right-5 z-[70] hidden max-w-sm rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl"></div>
 
-        window.onload = function() {
-            document.getElementById('setting-api-url').value = API_BASE_URL;
-            loadUserProfile();
-            loadDataFromDatabase();
-        };
+<script>
+  // Frontend only. Data persistence and permissions must be implemented by the backend.
+  const DEFAULT_API_BASE_URL = 'http://localhost:3000';
+  let API_BASE_URL = localStorage.getItem('lms_api_url') || DEFAULT_API_BASE_URL;
+  let activeSession = safeParse(localStorage.getItem('lms_session')) || { name: 'System Admin', role: 'Main Librarian' };
+  let books = [], members = [], loans = [];
+  let loansApiAvailable = false;
+  let activityLog = [];
+  let toastTimer = null;
+  const titles = { dashboard:'Overview', catalog:'Book catalog', members:'Members directory', loans:'Circulation & loans', reports:'Analytics & reports', settings:'System settings' };
 
-        function saveApiUrlSetting() {
-            const newUrl = document.getElementById('setting-api-url').value.trim();
-            if (newUrl) {
-                API_BASE_URL = newUrl.replace(/\/$/, ""); // Tanggalin ang trailing slash kung meron
-                localStorage.setItem('lms_api_url', API_BASE_URL);
-                showToast("API URL updated successfully!");
-                loadDataFromDatabase();
-            }
-        }
+  function safeParse(value) { try { return JSON.parse(value); } catch { return null; } }
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+  function first(obj, keys, fallback='') {
+    for (const key of keys) if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
+    return fallback;
+  }
+  function bookId(b) { return String(first(b,['bookId','BookID','BookId','id','ID','BOOKID'],'')); }
+  function bookTitle(b) { return String(first(b,['title','Title','TITLE'],'Untitled')); }
+  function bookAuthor(b) { return String(first(b,['author','Author','AUTHOR'],'Unknown author')); }
+  function bookISBN(b) { return String(first(b,['isbn','ISBN'],'—')); }
+  function bookGenre(b) { return String(first(b,['genre','Genre','GENRE'],'Unclassified')); }
+  function bookShelf(b) { return String(first(b,['shelf','Shelf','SHELF'],'—')); }
+  function totalCopies(b) { const n = Number(first(b,['totalCopies','TotalCopies','TOTALCOPIES','copies'],0)); return Number.isFinite(n) && n >= 0 ? n : 0; }
+  function availableCopies(b) { const n = Number(first(b,['availableCopies','AvailableCopies','AVAILABLECOPIES'],totalCopies(b))); return Number.isFinite(n) ? Math.max(0,n) : 0; }
+  function memberId(m) { return String(first(m,['id','memberId','ID','MemberID','MEMBERID'],'')); }
+  function memberName(m) { return String(first(m,['name','Name','NAME','fullName'],'Unknown member')); }
+  function memberEmail(m) { return String(first(m,['email','Email','EMAIL'],'—')); }
+  function loanId(l) { return String(first(l,['id','loanId','LoanID','loanID','LOANID'],'')); }
+  function loanBookRef(l) { return String(first(l,['bookId','BookID','book_id'],'')); }
+  function loanMemberRef(l) { return String(first(l,['memberId','MemberID','member_id'],'')); }
+  function loanBorrowDate(l) { return String(first(l,['borrowDate','BorrowDate','borrowedAt','borrowed_at','issueDate'],'' )).slice(0,10); }
+  function loanDueDate(l) { return String(first(l,['dueDate','DueDate','due_date'],'' )).slice(0,10); }
+  function loanReturnDate(l) { return String(first(l,['returnDate','ReturnDate','returnedAt','returned_at'],'' )).slice(0,10); }
+  function isReturned(l) { const s = String(first(l,['status','Status'],'')).toLowerCase(); return Boolean(loanReturnDate(l)) || ['returned','closed','complete','completed'].includes(s); }
+  function isOverdue(l) { return !isReturned(l) && !!loanDueDate(l) && loanDueDate(l) < localDateISO(); }
+  function localDateISO(date=new Date()) { const d = new Date(date.getTime() - date.getTimezoneOffset()*60000); return d.toISOString().slice(0,10); }
+  function formatDate(value) { if (!value) return '—'; const d = new Date(value.length===10 ? value+'T00:00:00' : value); return Number.isNaN(d.getTime()) ? esc(value) : d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
+  function initials(name) { return String(name || 'SA').trim().split(/\s+/).filter(Boolean).slice(0,2).map(s=>s[0]).join('').toUpperCase() || 'SA'; }
 
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const backdrop = document.getElementById('sidebar-backdrop');
-            sidebar.classList.toggle('-translate-x-full');
-            backdrop.classList.toggle('hidden');
-        }
+  window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('setting-api-url').value = API_BASE_URL;
+    document.getElementById('today-label').textContent = new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+    document.getElementById('loan-borrow-date').value = localDateISO();
+    const due = new Date(); due.setDate(due.getDate()+14); document.getElementById('loan-due-date').value = localDateISO(due);
+    loadUserProfile();
+    renderActivity();
+    loadDataFromDatabase(false);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal').forEach(m=>m.classList.add('hidden')); });
+    document.addEventListener('click', e => { if (!e.target.closest('#global-search') && !e.target.closest('#global-search-results')) document.getElementById('global-search-results').classList.add('hidden'); });
+  });
 
-        function loadUserProfile() {
-            if (!activeSession) return;
-            const name = activeSession.name;
-            const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-            document.getElementById('sidebar-initials').innerText = initials;
-            document.getElementById('sidebar-name').innerText = name;
-            document.getElementById('sidebar-role').innerText = activeSession.role;
-            document.getElementById('header-initials').innerText = initials;
-        }
-
-        async function loadDataFromDatabase() {
-            try {
-                const resBooks = await fetch(`${API_BASE_URL}/api/books`);
-                if (resBooks.ok) books = await resBooks.json();
-
-                const resMembers = await fetch(`${API_BASE_URL}/api/members`);
-                if (resMembers.ok) members = await resMembers.json();
-
-                renderAllViews();
-                showToast("Synced with server!");
-            } catch (error) {
-                console.warn("Server offline or unreachable. Using fallback.", error);
-                renderAllViews();
-                showToast("Running in offline local mode.");
-            }
-        }
-
-        function renderAllViews() {
-            renderDashboard();
-            renderCatalog();
-            renderMembers();
-        }
-
-        function renderDashboard() {
-            document.getElementById('stat-total-books').innerText = books.length;
-            document.getElementById('stat-active-members').innerText = members.length;
-            document.getElementById('stat-checked-out').innerText = loans.length;
-            document.getElementById('stat-overdue').innerText = "0";
-            document.getElementById('stat-pending-fines').innerText = "$0.00";
-            document.getElementById('rep-total').innerText = books.length;
-
-            const logContainer = document.getElementById('activity-log-list');
-            logContainer.innerHTML = activityLog.map(item => `
-                <div class="py-2.5 flex items-center justify-between text-xs">
-                    <span class="text-zinc-800 font-medium">${item.text}</span>
-                    <span class="text-[10px] text-zinc-400 font-mono">${item.time}</span>
-                </div>
-            `).join('');
-        }
-
-        function renderCatalog() {
-            const tbody = document.getElementById('catalog-table-body');
-            tbody.innerHTML = books.map(b => `
-                <tr class="hover:bg-zinc-50 border-b border-zinc-100">
-                    <td class="p-4 font-semibold">${b.Title || b.title || b.TITLE}<span class="block font-normal text-zinc-500 text-[11px]">${b.Author || b.author || b.AUTHOR}</span></td>
-                    <td class="p-4 font-mono">${b.ISBN || b.isbn || ''}</td>
-                    <td class="p-4">${b.Genre || b.genre || b.GENRE || ''}</td>
-                    <td class="p-4 font-mono">${b.Shelf || b.shelf || b.SHELF || ''}</td>
-                    <td class="p-4"><span class="font-bold">${b.AvailableCopies ?? b.availableCopies ?? b.TOTALCOPIES ?? 0}</span> / ${b.TotalCopies ?? b.totalCopies ?? b.TOTALCOPIES ?? 0}</td>
-                </tr>
-            `).join('');
-        }
-
-        function renderMembers() {
-            const tbody = document.getElementById('members-table-body');
-            tbody.innerHTML = members.map(m => `
-                <tr class="hover:bg-zinc-50 border-b border-zinc-100">
-                    <td class="p-4 font-semibold">${m.Name || m.name || m.NAME}</td>
-                    <td class="p-4 font-mono">${m.ID || m.id}</td>
-                    <td class="p-4">${m.Email || m.email || m.EMAIL || ''}</td>
-                    <td class="p-4">${m.Status || m.status || 'Active'}</td>
-                    <td class="p-4 font-mono">$0.00</td>
-                </tr>
-            `).join('');
-        }
-
-        async function handleSaveBook(e) {
-            e.preventDefault();
-            const btnSubmit = document.getElementById('btn-submit-book');
-            btnSubmit.disabled = true;
-            btnSubmit.innerText = 'Saving...';
-
-            const newBook = {
-                bookId: document.getElementById('book-input-id').value,
-                title: document.getElementById('book-input-title').value,
-                author: document.getElementById('book-input-author').value,
-                isbn: document.getElementById('book-input-isbn').value,
-                genre: document.getElementById('book-input-genre').value,
-                totalCopies: parseInt(document.getElementById('book-input-copies').value) || 1,
-                availableCopies: parseInt(document.getElementById('book-input-copies').value) || 1,
-                shelf: document.getElementById('book-input-shelf').value
-            };
-
-            books.push(newBook);
-            activityLog.unshift({ text: `Added book '${newBook.title}'`, time: "Just now" });
-            renderAllViews();
-
-            try {
-                await fetch(`${API_BASE_URL}/api/books`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newBook)
-                });
-                showToast("Book synced to server!");
-            } catch (err) {
-                showToast("Book saved locally.");
-            } finally {
-                btnSubmit.disabled = false;
-                btnSubmit.innerText = 'Save Book';
-                closeModal('modal-add-book');
-            }
-        }
-
-        async function handleSaveMember(e) {
-            e.preventDefault();
-            const btnSubmit = document.getElementById('btn-submit-member');
-            btnSubmit.disabled = true;
-            btnSubmit.innerText = 'Saving...';
-
-            const newMember = {
-                id: document.getElementById('member-input-id').value,
-                name: document.getElementById('member-input-name').value,
-                email: document.getElementById('member-input-email').value,
-                status: "Active",
-                fineBalance: 0.00
-            };
-
-            members.push(newMember);
-            activityLog.unshift({ text: `Registered member '${newMember.name}'`, time: "Just now" });
-            renderAllViews();
-
-            try {
-                await fetch(`${API_BASE_URL}/api/members`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newMember)
-                });
-                showToast("Member synced to server!");
-            } catch (err) {
-                showToast("Member saved locally.");
-            } finally {
-                btnSubmit.disabled = false;
-                btnSubmit.innerText = 'Save Member';
-                closeModal('modal-add-member');
-            }
-        }
-
-        function switchTab(tabId) {
-            const views = ['dashboard', 'catalog', 'members', 'loans', 'reports', 'settings'];
-            views.forEach(v => {
-                const el = document.getElementById(`view-${v}`);
-                if (el) el.classList.add('hidden');
-                const nav = document.getElementById(`nav-${v}`);
-                if (nav) nav.className = "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all";
-            });
-
-            document.getElementById(`view-${tabId}`).classList.remove('hidden');
-            document.getElementById(`nav-${tabId}`).className = "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium bg-white text-zinc-950 shadow-sm transition-all";
-
-            const titles = { dashboard: 'Dashboard Overview', catalog: 'Book Inventory Catalog', members: 'Members Directory', loans: 'Circulation & Loans', reports: 'Reports & Analytics', settings: 'System Settings' };
-            document.getElementById('page-title').innerText = titles[tabId];
-
-            if (window.innerWidth < 768) {
-                toggleSidebar();
-            }
-        }
-
-        function logoutSession() {
-            const confirmed = confirm("Are you sure you want to sign out?");
-            if (confirmed) {
-                localStorage.removeItem('lms_session');
-                window.location.href = 'login.html';
-            }
-        }
-
-        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.innerText = message;
-            toast.classList.remove('translate-y-24', 'opacity-0');
-            setTimeout(() => toast.classList.add('translate-y-24', 'opacity-0'), 3000);
-        }
-    </script>
+  function loadUserProfile() {
+    const name = activeSession?.name || 'System Admin';
+    document.getElementById('sidebar-name').textContent = name;
+    document.getElementById('sidebar-role').textContent = activeSession?.role || 'Librarian';
+    document.getElementById('sidebar-initials').textContent = initials(name);
+    document.getElementById('welcome-name').textContent = name.split(' ')[0] || 'Librarian';
+  }
+  function toggleSidebar(force) {
+    const sidebar = document.getElementById('sidebar'), backdrop = document.getElementById('sidebar-backdrop');
+    const shouldOpen = force === undefined ? sidebar.classList.contains('-translate-x-full') : force;
+    sidebar.classList.toggle('-translate-x-full', !shouldOpen); backdrop.classList.toggle('hidden', !shouldOpen);
+  }
+  function switchTab(id) {
+    document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));
+    document.getElementById('view-'+id)?.classList.remove('hidden');
+    document.querySelectorAll('.nav-link[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===id));
+    document.getElementById('page-title').textContent = titles[id] || 'ARCHIVE LMS';
+    if (window.innerWidth < 768) toggleSidebar(false);
+    if (id==='loans') renderLoans();
+    if (id==='reports') renderReports();
+  }
+  function openModal(id) {
+    if (id==='modal-loan') populateLoanSelects();
+    const modal = document.getElementById(id); modal.classList.remove('hidden'); modal.classList.add('flex');
+    const firstInput = modal.querySelector('input:not([type=hidden]),select'); if (firstInput) setTimeout(()=>firstInput.focus(),30);
+  }
+  function closeModal(id) { const modal=document.getElementById(id); modal.classList.add('hidden'); modal.classList.remove('flex'); }
+  function showToast(message, type='info') {
+    const toast=document.getElementById('toast'); toast.textContent=message;
+    toast.className='fixed bottom-5 right-5 z-[70] max-w-sm rounded-xl px-4 py-3 text-sm font-medium text-white shadow-xl '+(type==='error'?'bg-rose-700':type==='success'?'bg-emerald-700':'bg-slate-900');
+    toast.classList.remove('hidden'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.add('hidden'),3500);
+  }
+  function addActivity(text) { activityLog.unshift({text,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}); activityLog=activityLog.slice(0,30); renderActivity(); }
+  function clearActivity() { activityLog=[]; renderActivity(); showToast('Session activity cleared.'); }
+  function renderActivity() {
+    const box=document.getElementById('activity-log-list');
+    if (!activityLog.length) { box.innerHTML='<p class="py-5 text-center text-xs text-slate-400">No activity recorded in this session.</p>'; return; }
+    box.innerHTML=activityLog.map(a=>`<div class="flex items-center justify-between gap-4 py-3"><div class="flex min-w-0 items-center gap-3"><span class="h-2 w-2 shrink-0 rounded-full bg-blue-500"></span><span class="truncate text-xs font-medium text-slate-700">${esc(a.text)}</span></div><time class="shrink-0 text-[10px] text-slate-400">${esc(a.time)}</time></div>`).join('');
+  }
+  async function apiRequest(path, options={}) {
+    const response=await fetch(`${API_BASE_URL}${path}`, { ...options, headers:{ ...(options.body ? {'Content-Type':'application/json'} : {}), ...(options.headers||{}) } });
+    const text=await response.text();
+    let data=null; try { data=text ? JSON.parse(text) : null; } catch { data=text; }
+    if (!response.ok) {
+      const message=(data && typeof data==='object' && (data.message||data.error)) || `HTTP ${response.status}`;
+      throw new Error(message);
+    }
+    return data;
+  }
+  function unwrapArray(data, label) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.data)) return data.data;
+    if (data && Array.isArray(data[label])) return data[label];
+    throw new Error(`Unexpected ${label} API response: expected an array or { data: [] }.`);
+  }
+  async function loadDataFromDatabase(showMessage=true) {
+    const status=document.getElementById('connection-status');
+    if (status) status.textContent='Connecting to '+API_BASE_URL+' ...';
+    let booksOk=false, membersOk=false;
+    try { books=unwrapArray(await apiRequest('/api/books'),'books'); booksOk=true; }
+    catch(e) { console.error('Books API:',e); }
+    try { members=unwrapArray(await apiRequest('/api/members'),'members'); membersOk=true; }
+    catch(e) { console.error('Members API:',e); }
+    try { loans=unwrapArray(await apiRequest('/api/loans'),'loans'); loansApiAvailable=true; }
+    catch(e) { loans=[]; loansApiAvailable=false; console.info('Loans endpoint not available or invalid:',e.message); }
+    renderAllViews();
+    const connected=booksOk && membersOk;
+    if (status) {
+      status.textContent=connected ? `Books and members endpoints responded successfully. Loans API: ${loansApiAvailable?'available':'not available'}.` : `Connection incomplete. Books: ${booksOk?'OK':'failed'}; members: ${membersOk?'OK':'failed'}. Check server, URL, CORS, and API routes.`;
+      status.className='mt-4 rounded-lg p-3 text-xs '+(connected?'bg-emerald-50 text-emerald-800':'bg-rose-50 text-rose-800');
+    }
+    document.getElementById('loans-api-warning').classList.toggle('hidden',loansApiAvailable);
+    if (showMessage) showToast(connected?'Sync completed.':'Some API requests failed.',connected?'success':'error');
+    return connected;
+  }
+  function renderAllViews() {
+    renderDashboard(); renderCatalog(); renderMembers(); renderLoans(); renderReports();
+    document.getElementById('nav-books-count').textContent=books.length;
+    document.getElementById('nav-loans-count').textContent=loansApiAvailable?loans.filter(l=>!isReturned(l)).length:'—';
+  }
+  function renderDashboard() {
+    document.getElementById('stat-total-books').textContent=books.length;
+    document.getElementById('stat-total-copies').textContent=`${books.reduce((sum,b)=>sum+totalCopies(b),0)} total copies`;
+    document.getElementById('stat-members').textContent=members.length;
+    document.getElementById('stat-loans').textContent=loansApiAvailable?loans.filter(l=>!isReturned(l)).length:'—';
+    document.getElementById('loans-subtitle').textContent=loansApiAvailable?'Currently not returned':'Requires a working loans API';
+    document.getElementById('stat-overdue').textContent=loansApiAvailable?loans.filter(isOverdue).length:'—';
+    renderInventorySummary(); renderActivityChart();
+  }
+  function renderInventorySummary() {
+    const total=books.reduce((s,b)=>s+totalCopies(b),0), available=books.reduce((s,b)=>s+availableCopies(b),0), borrowed=Math.max(0,total-available);
+    const pct=total?Math.min(100,Math.round(available/total*100)):0;
+    document.getElementById('inventory-summary').innerHTML=books.length?`
+      <div class="flex items-center justify-between text-xs"><span class="text-slate-500">Available copies</span><b>${available} / ${total}</b></div>
+      <div class="h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" style="width:${pct}%"></div></div>
+      <div class="grid grid-cols-2 gap-3"><div class="rounded-xl bg-emerald-50 p-3"><p class="text-[10px] font-semibold text-emerald-700">Available</p><p class="mt-1 text-xl font-extrabold text-emerald-800">${available}</p></div><div class="rounded-xl bg-amber-50 p-3"><p class="text-[10px] font-semibold text-amber-700">Not available</p><p class="mt-1 text-xl font-extrabold text-amber-800">${borrowed}</p></div></div>
+      <p class="text-[10px] leading-4 text-slate-400">Computed from catalog copy fields. This is not a substitute for reconciled loan transactions.</p>` : '<p class="text-xs text-slate-400">No inventory records loaded.</p>';
+  }
+  function renderActivityChart() {
+    const chart=document.getElementById('activity-chart'), labels=document.getElementById('chart-month-labels'), status=document.getElementById('chart-status');
+    if (!loansApiAvailable) { chart.innerHTML='<div class="m-auto max-w-xs text-center text-xs leading-5 text-slate-400">Connect <code>/api/loans</code> with valid borrow dates to display real monthly activity.</div>'; labels.innerHTML=''; status.textContent='No loan data'; status.className='status status-gray'; return; }
+    const now=new Date(), months=[];
+    for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1); months.push({year:d.getFullYear(),month:d.getMonth(),label:d.toLocaleDateString(undefined,{month:'short'}),count:0});}
+    loans.forEach(l=>{const d=new Date(loanBorrowDate(l)+'T00:00:00'); if(Number.isNaN(d.getTime()))return; const m=months.find(x=>x.year===d.getFullYear()&&x.month===d.getMonth()); if(m)m.count++;});
+    const max=Math.max(1,...months.map(m=>m.count));
+    chart.innerHTML=months.map(m=>`<div class="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"><span class="text-[10px] font-semibold text-slate-500">${m.count}</span><div title="${m.label}: ${m.count} loans" class="w-full max-w-12 rounded-t-lg bg-blue-500/90 transition-all" style="height:${Math.max(m.count?8:2, m.count/max*125)}px"></div></div>`).join('');
+    labels.innerHTML=months.map(m=>`<span>${esc(m.label)}</span>`).join('');
+    status.textContent=`${loans.length} records`; status.className='status status-blue';
+  }
+  function renderCatalog() {
+    const query=(document.getElementById('catalog-search')?.value||'').trim().toLowerCase(), genre=document.getElementById('catalog-genre')?.value||'', availability=document.getElementById('catalog-availability')?.value||'', sort=document.getElementById('catalog-sort')?.value||'title';
+    const genreSelect=document.getElementById('catalog-genre'), selectedGenre=genreSelect.value;
+    const genres=[...new Set(books.map(bookGenre).filter(g=>g&&g!=='Unclassified'))].sort((a,b)=>a.localeCompare(b));
+    if (genreSelect.options.length !== genres.length+1 || genres.some((g,i)=>genreSelect.options[i+1]?.value!==g)) { genreSelect.innerHTML='<option value="">All genres</option>'+genres.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join(''); genreSelect.value=genres.includes(selectedGenre)?selectedGenre:''; }
+    let list=books.filter(b=>{
+      const text=[bookId(b),bookTitle(b),bookAuthor(b),bookISBN(b),bookGenre(b),bookShelf(b)].join(' ').toLowerCase();
+      return (!query||text.includes(query))&&(!genre||bookGenre(b)===genre)&&(availability!=='available'||availableCopies(b)>0)&&(availability!=='unavailable'||availableCopies(b)===0);
+    });
+    list.sort((a,b)=>sort==='title-desc'?bookTitle(b).localeCompare(bookTitle(a)):sort==='copies'?totalCopies(b)-totalCopies(a):bookTitle(a).localeCompare(bookTitle(b)));
+    document.getElementById('catalog-result-count').textContent=`${list.length} of ${books.length} records`;
+    document.getElementById('catalog-empty').classList.toggle('hidden',list.length!==0);
+    const tbody=document.getElementById('catalog-table-body');
+    tbody.innerHTML=list.map(b=>{const avail=availableCopies(b),total=totalCopies(b),id=bookId(b);return `<tr class="hover:bg-slate-50/80"><td class="px-5 py-4"><div class="flex items-center gap-3"><div class="flex h-10 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700">▤</div><div class="min-w-0"><div class="line-clamp-2 font-bold text-slate-800">${esc(bookTitle(b))}</div><div class="mt-1 text-xs text-slate-500">${esc(bookAuthor(b))}</div></div></div></td><td class="px-4 py-4"><div class="font-mono text-xs">${esc(bookISBN(b))}</div><div class="mt-1 text-[10px] text-slate-400">ID: ${esc(id||'—')}</div></td><td class="px-4 py-4 text-xs text-slate-600">${esc(bookGenre(b))}</td><td class="px-4 py-4 text-xs text-slate-600">${esc(bookShelf(b))}</td><td class="px-4 py-4"><span class="status ${avail>0?'status-green':'status-red'}">${avail>0?'Available':'Unavailable'}</span><div class="mt-1 text-[10px] text-slate-400">${avail} available / ${total} total</div></td><td class="px-5 py-4 text-right"><button class="btn btn-secondary !px-3 !py-2" onclick="editBook('${esc(id).replace(/'/g,'&#39;')}')">Edit</button></td></tr>`;}).join('');
+  }
+  function renderMembers() {
+    const q=(document.getElementById('members-search')?.value||'').toLowerCase().trim();
+    const list=members.filter(m=>[memberId(m),memberName(m),memberEmail(m),first(m,['status','Status'],'Active')].join(' ').toLowerCase().includes(q));
+    document.getElementById('members-empty').classList.toggle('hidden',list.length!==0);
+    document.getElementById('members-table-body').innerHTML=list.map(m=>{const id=memberId(m),name=memberName(m),status=String(first(m,['status','Status'],'Active'));return `<tr class="hover:bg-slate-50/80"><td class="px-5 py-4"><div class="flex items-center gap-3"><div class="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">${esc(initials(name))}</div><span class="font-bold">${esc(name)}</span></div></td><td class="px-4 py-4 font-mono text-xs">${esc(id||'—')}</td><td class="px-4 py-4 text-xs text-slate-600">${esc(memberEmail(m))}</td><td class="px-4 py-4"><span class="status ${status.toLowerCase()==='active'?'status-green':'status-gray'}">${esc(status)}</span></td><td class="px-5 py-4 text-right"><button class="btn btn-secondary !px-3 !py-2" onclick="showMemberDetails('${esc(id).replace(/'/g,'&#39;')}')">View</button></td></tr>`;}).join('');
+  }
+  function memberById(id) { return members.find(m=>memberId(m)===String(id)); }
+  function bookById(id) { return books.find(b=>bookId(b)===String(id)); }
+  function renderLoans() {
+    const available=loansApiAvailable;
+    document.getElementById('loan-active-count').textContent=available?loans.filter(l=>!isReturned(l)).length:'—';
+    document.getElementById('loan-overdue-count').textContent=available?loans.filter(isOverdue).length:'—';
+    document.getElementById('loan-returned-count').textContent=available?loans.filter(isReturned).length:'—';
+    document.getElementById('loan-due-today-count').textContent=available?loans.filter(l=>!isReturned(l)&&loanDueDate(l)===localDateISO()).length:'—';
+    document.getElementById('loans-api-warning').classList.toggle('hidden',available);
+    const q=(document.getElementById('loans-search')?.value||'').toLowerCase().trim(), filter=document.getElementById('loans-filter')?.value||'';
+    const list=loans.filter(l=>{const m=memberById(loanMemberRef(l)),b=bookById(loanBookRef(l)),status=isReturned(l)?'returned':isOverdue(l)?'overdue':'active';const hay=[loanId(l),memberName(m||{}),bookTitle(b||{}),loanMemberRef(l),loanBookRef(l)].join(' ').toLowerCase();return (!q||hay.includes(q))&&(!filter||status===filter);});
+    document.getElementById('loans-empty').classList.toggle('hidden',list.length!==0);
+    document.getElementById('loans-table-body').innerHTML=list.map(l=>{const m=memberById(loanMemberRef(l)),b=bookById(loanBookRef(l)),returned=isReturned(l),overdue=isOverdue(l),status=returned?'Returned':overdue?'Overdue':'Active';const cls=returned?'status-gray':overdue?'status-red':'status-green';return `<tr class="hover:bg-slate-50/80"><td class="px-5 py-4"><div class="font-bold">${esc(memberName(m||{}))}</div><div class="mt-1 text-xs text-slate-500">${esc(bookTitle(b||{}))}</div><div class="mt-1 font-mono text-[10px] text-slate-400">Loan ID: ${esc(loanId(l)||'—')}</div></td><td class="px-4 py-4 text-xs">${esc(formatDate(loanBorrowDate(l)))}</td><td class="px-4 py-4 text-xs ${overdue?'font-bold text-rose-600':''}">${esc(formatDate(loanDueDate(l)))}</td><td class="px-4 py-4"><span class="status ${cls}">${status}</span>${returned?`<div class="mt-1 text-[10px] text-slate-400">Returned ${esc(formatDate(loanReturnDate(l)))}</div>`:''}</td><td class="px-5 py-4 text-right">${returned?'<span class="text-xs text-slate-400">Complete</span>':`<button class="btn btn-secondary !px-3 !py-2" onclick="returnLoan('${esc(loanId(l)).replace(/'/g,'&#39;')}')">Mark returned</button>`}</td></tr>`;}).join('');
+  }
+  function renderReports() {
+    const total=books.reduce((s,b)=>s+totalCopies(b),0), avail=books.reduce((s,b)=>s+availableCopies(b),0), unavailable=Math.max(0,total-avail);
+    const items=[{label:'Available copies',value:avail,color:'bg-emerald-500'},{label:'Not currently available',value:unavailable,color:'bg-amber-500'}];
+    document.getElementById('report-inventory').innerHTML=items.map(i=>`<div><div class="mb-2 flex justify-between text-xs"><span class="text-slate-600">${i.label}</span><b>${i.value}</b></div><div class="h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full ${i.color}" style="width:${total?Math.min(100,i.value/total*100):0}%"></div></div></div>`).join('')+`<p class="text-[10px] text-slate-400">${books.length} titles · ${total} copies in catalog</p>`;
+    document.getElementById('report-loans').innerHTML=loansApiAvailable?[
+      {label:'Active',value:loans.filter(l=>!isReturned(l)&&!isOverdue(l)).length,color:'bg-blue-500'},
+      {label:'Overdue',value:loans.filter(isOverdue).length,color:'bg-rose-500'},
+      {label:'Returned',value:loans.filter(isReturned).length,color:'bg-slate-400'}
+    ].map(i=>`<div><div class="mb-2 flex justify-between text-xs"><span class="text-slate-600">${i.label}</span><b>${i.value}</b></div><div class="h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full ${i.color}" style="width:${loans.length?i.value/loans.length*100:0}%"></div></div></div>`).join(''):`<p class="text-xs text-slate-400">Loans data unavailable. Implement GET /api/loans to enable these figures.</p>`;
+  }
+  function editBook(id) {
+    const b=bookById(id); if(!b){showToast('Book record not found.', 'error');return;}
+    document.getElementById('book-modal-title').textContent='Edit book';
+    document.getElementById('book-original-id').value=id;
+    document.getElementById('book-input-id').value=bookId(b);
+    document.getElementById('book-input-isbn').value=bookISBN(b)==='—'?'':bookISBN(b);
+    document.getElementById('book-input-title').value=bookTitle(b);
+    document.getElementById('book-input-author').value=bookAuthor(b)==='Unknown author'?'':bookAuthor(b);
+    document.getElementById('book-input-genre').value=bookGenre(b)==='Unclassified'?'':bookGenre(b);
+    document.getElementById('book-input-copies').value=totalCopies(b);
+    document.getElementById('book-input-shelf').value=bookShelf(b)==='—'?'':bookShelf(b);
+    showFormError('book-form-error',''); openModal('modal-add-book');
+  }
+  function resetBookForm() { document.getElementById('form-add-book').reset(); document.getElementById('book-original-id').value=''; document.getElementById('book-modal-title').textContent='Add book'; document.getElementById('book-input-copies').value=1; showFormError('book-form-error',''); }
+  function showFormError(id,message) { const el=document.getElementById(id); el.textContent=message; el.classList.toggle('hidden',!message); }
+  async function handleSaveBook(event) {
+    event.preventDefault(); showFormError('book-form-error','');
+    const originalId=document.getElementById('book-original-id').value;
+    const id=document.getElementById('book-input-id').value.trim(), title=document.getElementById('book-input-title').value.trim(), author=document.getElementById('book-input-author').value.trim();
+    const copies=Number(document.getElementById('book-input-copies').value);
+    if(!id||!title||!author){showFormError('book-form-error','Book ID, title, and author are required.');return;}
+    if(!Number.isInteger(copies)||copies<1){showFormError('book-form-error','Total copies must be a whole number greater than zero.');return;}
+    const duplicate=books.some(b=>bookId(b).toLowerCase()===id.toLowerCase()&&bookId(b)!==originalId);
+    if(duplicate){showFormError('book-form-error','That Book ID already exists in the loaded catalog.');return;}
+    const old=originalId?bookById(originalId):null;
+    const payload={bookId:id,title,author,isbn:document.getElementById('book-input-isbn').value.trim(),genre:document.getElementById('book-input-genre').value.trim(),totalCopies:copies,availableCopies:old?Math.min(availableCopies(old),copies):copies,shelf:document.getElementById('book-input-shelf').value.trim()};
+    const btn=document.getElementById('btn-submit-book'); btn.disabled=true; btn.textContent='Saving...';
+    try {
+      if(originalId) {
+        // Requires backend support for PUT /api/books/:id. No local fake success.
+        await apiRequest(`/api/books/${encodeURIComponent(originalId)}`,{method:'PUT',body:JSON.stringify(payload)});
+      } else {
+        await apiRequest('/api/books',{method:'POST',body:JSON.stringify(payload)});
+      }
+      addActivity(`${originalId?'Updated':'Added'} book: ${title}`); closeModal('modal-add-book'); resetBookForm(); await loadDataFromDatabase(false); showToast(originalId?'Book updated.':'Book saved to server.','success');
+    } catch(err) {
+      showFormError('book-form-error',`${err.message}. The record was not marked as saved. Check whether the backend supports this request.`);
+    } finally {btn.disabled=false;btn.textContent='Save book';}
+  }
+  async function handleSaveMember(event) {
+    event.preventDefault(); showFormError('member-form-error','');
+    const id=document.getElementById('member-input-id').value.trim(),name=document.getElementById('member-input-name').value.trim(),email=document.getElementById('member-input-email').value.trim();
+    if(!id||!name||!email){showFormError('member-form-error','Member ID, name, and email are required.');return;}
+    if(members.some(m=>memberId(m).toLowerCase()===id.toLowerCase())){showFormError('member-form-error','That Member ID already exists in the loaded directory.');return;}
+    const btn=document.getElementById('btn-submit-member');btn.disabled=true;btn.textContent='Saving...';
+    try { await apiRequest('/api/members',{method:'POST',body:JSON.stringify({id,name,email,status:'Active',fineBalance:0})}); addActivity(`Registered member: ${name}`); closeModal('modal-add-member');document.getElementById('form-add-member').reset();await loadDataFromDatabase(false);showToast('Member saved to server.','success'); }
+    catch(err){showFormError('member-form-error',`${err.message}. The record was not marked as saved. Check the members API.`);}
+    finally{btn.disabled=false;btn.textContent='Save member';}
+  }
+  function populateLoanSelects() {
+    const ms=document.getElementById('loan-member'), bs=document.getElementById('loan-book');
+    ms.innerHTML='<option value="">Select member</option>'+members.map(m=>`<option value="${esc(memberId(m))}">${esc(memberName(m))} (${esc(memberId(m))})</option>`).join('');
+    bs.innerHTML='<option value="">Select book</option>'+books.filter(b=>availableCopies(b)>0).map(b=>`<option value="${esc(bookId(b))}">${esc(bookTitle(b))} — ${availableCopies(b)} available</option>`).join('');
+    showFormError('loan-form-error','');
+  }
+  async function handleIssueLoan(event) {
+    event.preventDefault(); showFormError('loan-form-error','');
+    if(!loansApiAvailable){showFormError('loan-form-error','The GET /api/loans endpoint is not available. Implement the loans API before issuing loans.');return;}
+    const member=document.getElementById('loan-member').value,book=document.getElementById('loan-book').value,borrowDate=document.getElementById('loan-borrow-date').value,dueDate=document.getElementById('loan-due-date').value;
+    if(!member||!book||!borrowDate||!dueDate){showFormError('loan-form-error','Select a member, a book, and both dates.');return;}
+    if(dueDate<borrowDate){showFormError('loan-form-error','Due date cannot be earlier than borrow date.');return;}
+    const selected=bookById(book); if(!selected||availableCopies(selected)<1){showFormError('loan-form-error','This book is no longer available. Refresh catalog data.');return;}
+    const btn=document.getElementById('btn-submit-loan');btn.disabled=true;btn.textContent='Submitting...';
+    try {
+      // Expected backend contract; server must validate availability and update copies transactionally.
+      await apiRequest('/api/loans',{method:'POST',body:JSON.stringify({memberId:member,bookId:book,borrowDate,dueDate,status:'Active'})});
+      closeModal('modal-loan');addActivity(`Issued ${bookTitle(selected)} to ${memberName(memberById(member)||{})}`);await loadDataFromDatabase(false);showToast('Loan created on server.','success');
+    } catch(err){showFormError('loan-form-error',`${err.message}. No successful loan was confirmed.`);}
+    finally{btn.disabled=false;btn.textContent='Issue book';}
+  }
+  async function returnLoan(id) {
+    if(!loansApiAvailable){showToast('Loans API is not available.','error');return;}
+    if(!confirm('Mark this loan as returned? The backend must update inventory consistently.'))return;
+    try {
+      await apiRequest(`/api/loans/${encodeURIComponent(id)}/return`,{method:'PATCH',body:JSON.stringify({returnDate:localDateISO()})});
+      addActivity(`Returned loan ${id}`);await loadDataFromDatabase(false);showToast('Return recorded on server.','success');
+    } catch(err){showToast(`Return failed: ${err.message}`,'error');}
+  }
+  function showMemberDetails(id) {
+    const m=memberById(id); if(!m)return;
+    const active=loansApiAvailable?loans.filter(l=>loanMemberRef(l)===id&&!isReturned(l)).length:null;
+    alert(`Member: ${memberName(m)}\nID: ${memberId(m)}\nEmail: ${memberEmail(m)}\nStatus: ${first(m,['status','Status'],'Active')}\n${active===null?'Loan history: loans API unavailable':'Active loans: '+active}`);
+  }
+  function handleGlobalSearch(value) {
+    const box=document.getElementById('global-search-results'), q=value.trim().toLowerCase();
+    if(q.length<2){box.classList.add('hidden');box.innerHTML='';return;}
+    const results=[
+      ...books.filter(b=>[bookTitle(b),bookAuthor(b),bookISBN(b),bookId(b)].join(' ').toLowerCase().includes(q)).slice(0,5).map(b=>({type:'Book',label:bookTitle(b),detail:`${bookAuthor(b)} · ID ${bookId(b)}`,view:'catalog'})),
+      ...members.filter(m=>[memberName(m),memberId(m),memberEmail(m)].join(' ').toLowerCase().includes(q)).slice(0,5).map(m=>({type:'Member',label:memberName(m),detail:`${memberId(m)} · ${memberEmail(m)}`,view:'members'})),
+      ...(loansApiAvailable?loans.filter(l=>[loanId(l),loanBookRef(l),loanMemberRef(l)].join(' ').toLowerCase().includes(q)).slice(0,3).map(l=>({type:'Loan',label:`Loan ${loanId(l)||'record'}`,detail:`Member ${loanMemberRef(l)} · Book ${loanBookRef(l)}`,view:'loans'})):[])
+    ].slice(0,10);
+    box.innerHTML=results.length?results.map((r,i)=>`<button class="flex w-full items-start gap-3 rounded-lg p-3 text-left hover:bg-slate-50" onclick="selectGlobalResult('${r.view}')"><span class="rounded-md bg-blue-50 px-2 py-1 text-[9px] font-bold uppercase text-blue-700">${r.type}</span><span class="min-w-0"><b class="block truncate text-xs text-slate-800">${esc(r.label)}</b><small class="mt-1 block truncate text-[10px] text-slate-500">${esc(r.detail)}</small></span></button>`).join(''):'<p class="p-4 text-xs text-slate-400">No matches in currently loaded records.</p>';
+    box.classList.remove('hidden');
+  }
+  function selectGlobalResult(view) { document.getElementById('global-search-results').classList.add('hidden');switchTab(view);if(view==='catalog')document.getElementById('catalog-search').value=document.getElementById('global-search').value;if(view==='members')document.getElementById('members-search').value=document.getElementById('global-search').value;renderCatalog();renderMembers(); }
+  function runGlobalSearch() {
+    const q=document.getElementById('global-search').value.trim();if(!q)return;
+    const hasBook=books.some(b=>[bookTitle(b),bookAuthor(b),bookISBN(b),bookId(b)].join(' ').toLowerCase().includes(q.toLowerCase()));
+    const hasMember=members.some(m=>[memberName(m),memberId(m),memberEmail(m)].join(' ').toLowerCase().includes(q.toLowerCase()));
+    if(hasBook){switchTab('catalog');document.getElementById('catalog-search').value=q;renderCatalog();}
+    else if(hasMember){switchTab('members');document.getElementById('members-search').value=q;renderMembers();}
+    else {document.getElementById('global-search-results').classList.remove('hidden');}
+  }
+  function exportTableCSV(type) {
+    let rows=[], filename=`archive-${type}-${localDateISO()}.csv`;
+    if(type==='catalog') rows=[['Book ID','Title','Author','ISBN','Genre','Shelf','Available Copies','Total Copies'],...books.map(b=>[bookId(b),bookTitle(b),bookAuthor(b),bookISBN(b),bookGenre(b),bookShelf(b),availableCopies(b),totalCopies(b)])];
+    else if(type==='members') rows=[['Member ID','Name','Email','Status'],...members.map(m=>[memberId(m),memberName(m),memberEmail(m),first(m,['status','Status'],'Active')])];
+    else if(type==='loans') {
+      if(!loansApiAvailable){showToast('Cannot export loans: loans API is unavailable.','error');return;}
+      rows=[['Loan ID','Member ID','Book ID','Borrow Date','Due Date','Return Date','Status'],...loans.map(l=>[loanId(l),loanMemberRef(l),loanBookRef(l),loanBorrowDate(l),loanDueDate(l),loanReturnDate(l),isReturned(l)?'Returned':isOverdue(l)?'Overdue':'Active'])];
+    }
+    const csv=rows.map(row=>row.map(v=>{const s=String(v??'');return '"'+s.replace(/"/g,'""')+'"';}).join(',')).join('\r\n');
+    const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);showToast('CSV exported.','success');
+  }
+  function saveApiUrlSetting() {
+    const value=document.getElementById('setting-api-url').value.trim().replace(/\/+$/,'');
+    if(!/^https?:\/\/.+/i.test(value)){showToast('Enter a valid http:// or https:// API URL.','error');return;}
+    API_BASE_URL=value;localStorage.setItem('lms_api_url',API_BASE_URL);loadDataFromDatabase(true);
+  }
+  function logoutSession() {
+    if(!confirm('Sign out of this browser session?'))return;
+    localStorage.removeItem('lms_session');window.location.href='login.html';
+  }
+</script>
 </body>
 </html>
+'''
+
+path = Path("/mnt/data/archive_lms_upgraded.html")
+path.write_text(html, encoding="utf-8")
+print(f"Created {path} ({len(html):,} characters, {len(html.splitlines()):,} lines)")
