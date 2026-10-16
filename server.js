@@ -3,35 +3,52 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const crypto = require('crypto');
-const { promisify } = require('util');
-const { MongoClient } = require('mongodb');
-
-const scrypt = promisify(crypto.scrypt);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ==========================================
-// MONGODB ATLAS
+// MIDDLEWARE
 // ==========================================
-let mongoClient = null;
-let db = null;
-let mongoConnected = false;
-
-const COLLECTIONS = {
-    books: 'books',
-    members: 'members',
-    loans: 'loans',
-    users: 'users',
-    counters: 'counters'
-};
-
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
 // ==========================================
-// GENERAL HELPERS
+// TEMPORARY IN-MEMORY STORAGE
+// Data resets when the server restarts.
+// ==========================================
+let books = [
+    {
+        bookId: '101',
+        title: 'The Great King',
+        author: 'Luther',
+        isbn: 'LB-101',
+        genre: 'Classic Fiction',
+        totalCopies: 5,
+        availableCopies: 5,
+        shelf: 'A-01'
+    }
+];
+
+let members = [
+    {
+        id: 'M-001',
+        name: 'Juan Dela Cruz',
+        email: 'juan@example.com',
+        status: 'Active',
+        fineBalance: 0
+    }
+];
+
+let loans = [];
+let users = [];
+
+let nextBookId = 102;
+let nextMemberId = 2;
+let nextLoanId = 1;
+
+// ==========================================
+// HELPER FUNCTIONS
 // ==========================================
 function today() {
     return new Date().toISOString().slice(0, 10);
@@ -41,73 +58,20 @@ function isNonEmptyString(value) {
     return typeof value === 'string' && value.trim().length > 0;
 }
 
-function cleanDocument(document) {
-    if (!document) return null;
-
-    const { _id, passwordHash, passwordSalt, ...safe } = document;
-    return safe;
-}
-
-function cleanDocuments(documents) {
-    return documents.map(cleanDocument);
-}
-
-function databaseRequired(req, res, next) {
-    if (!mongoConnected || !db) {
-        return res.status(503).json({
-            error: 'Database is not connected. Please try again shortly.'
-        });
-    }
-
-    next();
-}
-
-// Apply database availability check to API routes.
-// Health check remains accessible when Atlas is offline.
-app.use('/api', (req, res, next) => {
-    if (req.path === '/health') return next();
-    databaseRequired(req, res, next);
-});
-
-async function getNextSequence(name, currentMax = 0) {
-    await db.collection(COLLECTIONS.counters).updateOne(
-        { _id: name },
-        { $max: { seq: currentMax } },
-        { upsert: true }
+function findBook(id) {
+    return books.find(
+        book => String(book.bookId ?? book.id) === String(id)
     );
-
-    const result = await db.collection(COLLECTIONS.counters)
-        .findOneAndUpdate(
-            { _id: name },
-            { $inc: { seq: 1 } },
-            { returnDocument: 'after' }
-        );
-
-    return result.seq;
 }
 
-async function findBook(id) {
-    return db.collection(COLLECTIONS.books).findOne({
-        $or: [
-            { bookId: String(id) },
-            { id: String(id) }
-        ]
-    });
+function findMember(id) {
+    return members.find(
+        member => String(member.id ?? member.memberId) === String(id)
+    );
 }
 
-async function findMember(id) {
-    return db.collection(COLLECTIONS.members).findOne({
-        $or: [
-            { id: String(id) },
-            { memberId: String(id) }
-        ]
-    });
-}
-
-async function findLoan(id) {
-    return db.collection(COLLECTIONS.loans).findOne({
-        id: String(id)
-    });
+function findLoan(id) {
+    return loans.find(loan => String(loan.id) === String(id));
 }
 
 function getLoanResponse(loan) {
@@ -116,7 +80,7 @@ function getLoanResponse(loan) {
         loan.dueDate < today();
 
     return {
-        ...cleanDocument(loan),
+        ...loan,
         status: loan.status === 'Returned'
             ? 'Returned'
             : isOverdue
@@ -125,12 +89,18 @@ function getLoanResponse(loan) {
     };
 }
 
-async function validateBook(body, existingBook = null) {
-    if (!isNonEmptyString(body.title)) {
+function validateBook(body, existingBook = null) {
+    const {
+        title,
+        author,
+        isbn
+    } = body;
+
+    if (!isNonEmptyString(title)) {
         return 'Book title is required.';
     }
 
-    if (!isNonEmptyString(body.author)) {
+    if (!isNonEmptyString(author)) {
         return 'Author is required.';
     }
 
@@ -142,56 +112,20 @@ async function validateBook(body, existingBook = null) {
         return 'Total copies must be a positive whole number.';
     }
 
-    const isbn = String(body.isbn ?? '').trim();
+    const duplicateISBN = isbn
+        ? books.find(book =>
+            String(book.isbn).toLowerCase() ===
+                String(isbn).trim().toLowerCase() &&
+            String(book.bookId ?? book.id) !==
+                String(existingBook?.bookId ?? existingBook?.id)
+        )
+        : null;
 
-    if (isbn) {
-        const query = {
-            isbn: { $regex: `^${escapeRegex(isbn)}$`, $options: 'i' }
-        };
-
-        if (existingBook) {
-            query.bookId = { $ne: String(existingBook.bookId) };
-        }
-
-        const duplicate = await db.collection(COLLECTIONS.books)
-            .findOne(query);
-
-        if (duplicate) {
-            return 'A book with this ISBN already exists.';
-        }
+    if (duplicateISBN) {
+        return 'A book with this ISBN already exists.';
     }
 
     return null;
-}
-
-function escapeRegex(value) {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function validDate(value) {
-    if (typeof value !== 'string' ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        return false;
-    }
-
-    const date = new Date(`${value}T00:00:00.000Z`);
-
-    return !Number.isNaN(date.getTime()) &&
-        date.toISOString().slice(0, 10) === value;
-}
-
-function handleError(res, error) {
-    console.error('API error:', error);
-
-    if (error.code === 11000) {
-        return res.status(409).json({
-            error: 'A record with that unique value already exists.'
-        });
-    }
-
-    return res.status(500).json({
-        error: 'Internal server error.'
-    });
 }
 
 // ==========================================
@@ -201,7 +135,6 @@ app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
         message: 'ARCHIVE LMS API is running.',
-        database: mongoConnected ? 'connected' : 'disconnected',
         timestamp: new Date().toISOString()
     });
 });
@@ -211,134 +144,95 @@ app.get('/api/health', (req, res) => {
 // ==========================================
 
 // GET all books
-app.get('/api/books', async (req, res) => {
-    try {
-        const books = await db.collection(COLLECTIONS.books)
-            .find({})
-            .sort({ bookId: 1 })
-            .toArray();
-
-        res.json(cleanDocuments(books));
-    } catch (error) {
-        handleError(res, error);
-    }
+app.get('/api/books', (req, res) => {
+    res.json(books);
 });
 
 // GET one book
-app.get('/api/books/:id', async (req, res) => {
-    try {
-        const book = await findBook(req.params.id);
+app.get('/api/books/:id', (req, res) => {
+    const book = findBook(req.params.id);
 
-        if (!book) {
-            return res.status(404).json({ error: 'Book not found.' });
-        }
-
-        res.json(cleanDocument(book));
-    } catch (error) {
-        handleError(res, error);
+    if (!book) {
+        return res.status(404).json({
+            error: 'Book not found.'
+        });
     }
+
+    res.json(book);
 });
 
 // ADD a book
-app.post('/api/books', async (req, res) => {
-    try {
-        const error = await validateBook(req.body);
+app.post('/api/books', (req, res) => {
+    const error = validateBook(req.body);
 
-        if (error) {
-            return res.status(400).json({ error });
-        }
-
-        const totalCopies = Number(req.body.totalCopies ?? 1);
-
-        const existingBooks = await db.collection(COLLECTIONS.books)
-            .find({}, { projection: { bookId: 1 } })
-            .toArray();
-
-        const maxId = existingBooks.reduce((max, book) => {
-            const id = Number(book.bookId);
-            return Number.isInteger(id) ? Math.max(max, id) : max;
-        }, 100);
-
-        const nextId = await getNextSequence('bookId', maxId);
-
-        const book = {
-            bookId: String(nextId),
-            title: req.body.title.trim(),
-            author: req.body.author.trim(),
-            isbn: String(req.body.isbn ?? '').trim(),
-            genre: String(req.body.genre ?? 'Uncategorized').trim(),
-            totalCopies,
-            availableCopies: totalCopies,
-            shelf: String(req.body.shelf ?? '').trim()
-        };
-
-        await db.collection(COLLECTIONS.books).insertOne(book);
-
-        res.status(201).json({
-            message: 'Book added successfully.',
-            book
-        });
-    } catch (error) {
-        handleError(res, error);
+    if (error) {
+        return res.status(400).json({ error });
     }
+
+    const totalCopies = Number(req.body.totalCopies ?? 1);
+
+    const book = {
+        bookId: String(nextBookId++),
+        title: req.body.title.trim(),
+        author: req.body.author.trim(),
+        isbn: String(req.body.isbn ?? '').trim(),
+        genre: String(req.body.genre ?? 'Uncategorized').trim(),
+        totalCopies,
+        availableCopies: totalCopies,
+        shelf: String(req.body.shelf ?? '').trim()
+    };
+
+    books.push(book);
+
+    res.status(201).json({
+        message: 'Book added successfully.',
+        book
+    });
 });
 
-// EDIT a book
-app.put('/api/books/:id', async (req, res) => {
-    try {
-        const book = await findBook(req.params.id);
+// EDIT an existing book
+app.put('/api/books/:id', (req, res) => {
+    const book = findBook(req.params.id);
 
-        if (!book) {
-            return res.status(404).json({ error: 'Book not found.' });
-        }
-
-        const error = await validateBook(req.body, book);
-
-        if (error) {
-            return res.status(400).json({ error });
-        }
-
-        const checkedOut = await db.collection(COLLECTIONS.loans)
-            .countDocuments({
-                bookId: String(book.bookId ?? book.id),
-                status: 'Active'
-            });
-
-        const totalCopies = Number(
-            req.body.totalCopies ?? book.totalCopies
-        );
-
-        if (totalCopies < checkedOut) {
-            return res.status(400).json({
-                error: `At least ${checkedOut} total copies are required because those copies are on loan.`
-            });
-        }
-
-        const updatedBook = {
-            ...book,
-            title: req.body.title.trim(),
-            author: req.body.author.trim(),
-            isbn: String(req.body.isbn ?? '').trim(),
-            genre: String(req.body.genre ?? book.genre).trim(),
-            shelf: String(req.body.shelf ?? book.shelf).trim(),
-            totalCopies,
-            availableCopies: totalCopies - checkedOut
-        };
-
-        delete updatedBook._id;
-
-        await db.collection(COLLECTIONS.books).replaceOne(
-            { _id: book._id },
-            updatedBook
-        );
-
-        res.json({
-            message: 'Book updated successfully.',
-            book: updatedBook
+    if (!book) {
+        return res.status(404).json({
+            error: 'Book not found.'
         });
-    } catch (error) {
-        handleError(res, error);
     }
+
+    const error = validateBook(req.body, book);
+
+    if (error) {
+        return res.status(400).json({ error });
+    }
+
+    const checkedOut = loans.filter(loan =>
+        loan.bookId === String(book.bookId) &&
+        loan.status === 'Active'
+    ).length;
+
+    const totalCopies = Number(
+        req.body.totalCopies ?? book.totalCopies
+    );
+
+    if (totalCopies < checkedOut) {
+        return res.status(400).json({
+            error: `At least ${checkedOut} total copies are required because those copies are on loan.`
+        });
+    }
+
+    book.title = req.body.title.trim();
+    book.author = req.body.author.trim();
+    book.isbn = String(req.body.isbn ?? '').trim();
+    book.genre = String(req.body.genre ?? book.genre).trim();
+    book.shelf = String(req.body.shelf ?? book.shelf).trim();
+    book.totalCopies = totalCopies;
+    book.availableCopies = totalCopies - checkedOut;
+
+    res.json({
+        message: 'Book updated successfully.',
+        book
+    });
 });
 
 // ==========================================
@@ -346,86 +240,65 @@ app.put('/api/books/:id', async (req, res) => {
 // ==========================================
 
 // GET all members
-app.get('/api/members', async (req, res) => {
-    try {
-        const members = await db.collection(COLLECTIONS.members)
-            .find({})
-            .sort({ id: 1 })
-            .toArray();
-
-        res.json(cleanDocuments(members));
-    } catch (error) {
-        handleError(res, error);
-    }
+app.get('/api/members', (req, res) => {
+    res.json(members);
 });
 
 // GET one member
-app.get('/api/members/:id', async (req, res) => {
-    try {
-        const member = await findMember(req.params.id);
+app.get('/api/members/:id', (req, res) => {
+    const member = findMember(req.params.id);
 
-        if (!member) {
-            return res.status(404).json({ error: 'Member not found.' });
-        }
-
-        res.json(cleanDocument(member));
-    } catch (error) {
-        handleError(res, error);
+    if (!member) {
+        return res.status(404).json({
+            error: 'Member not found.'
+        });
     }
+
+    res.json(member);
 });
 
 // REGISTER a member
-app.post('/api/members', async (req, res) => {
-    try {
-        const { name, email } = req.body;
+app.post('/api/members', (req, res) => {
+    const { name, email } = req.body;
 
-        if (!isNonEmptyString(name)) {
-            return res.status(400).json({ error: 'Member name is required.' });
-        }
-
-        if (!isNonEmptyString(email)) {
-            return res.status(400).json({ error: 'Member email is required.' });
-        }
-
-        const normalizedEmail = email.trim().toLowerCase();
-
-        const duplicate = await db.collection(COLLECTIONS.members)
-            .findOne({ email: normalizedEmail });
-
-        if (duplicate) {
-            return res.status(409).json({
-                error: 'A member with this email already exists.'
-            });
-        }
-
-        const existingMembers = await db.collection(COLLECTIONS.members)
-            .find({}, { projection: { id: 1 } })
-            .toArray();
-
-        const maxId = existingMembers.reduce((max, member) => {
-            const match = String(member.id).match(/^M-(\d+)$/);
-            return match ? Math.max(max, Number(match[1])) : max;
-        }, 0);
-
-        const nextId = await getNextSequence('memberId', maxId);
-
-        const member = {
-            id: `M-${String(nextId).padStart(3, '0')}`,
-            name: name.trim(),
-            email: normalizedEmail,
-            status: 'Active',
-            fineBalance: 0
-        };
-
-        await db.collection(COLLECTIONS.members).insertOne(member);
-
-        res.status(201).json({
-            message: 'Member registered successfully.',
-            member
+    if (!isNonEmptyString(name)) {
+        return res.status(400).json({
+            error: 'Member name is required.'
         });
-    } catch (error) {
-        handleError(res, error);
     }
+
+    if (!isNonEmptyString(email)) {
+        return res.status(400).json({
+            error: 'Member email is required.'
+        });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const duplicate = members.some(member =>
+        String(member.email).toLowerCase() === normalizedEmail
+    );
+
+    if (duplicate) {
+        return res.status(409).json({
+            error: 'A member with this email already exists.'
+        });
+    }
+
+    const member = {
+        id: `M-${String(nextMemberId++).padStart(3, '0')}`,
+        name: name.trim(),
+        email: normalizedEmail,
+        status: 'Active',
+        fineBalance: 0
+    };
+
+    members.push(member);
+
+    res.status(201).json({
+        message: 'Member registered successfully.',
+        member
+    });
 });
 
 // ==========================================
@@ -433,364 +306,295 @@ app.post('/api/members', async (req, res) => {
 // ==========================================
 
 // GET all loans
-app.get('/api/loans', async (req, res) => {
-    try {
-        const loans = await db.collection(COLLECTIONS.loans)
-            .find({})
-            .sort({ id: 1 })
-            .toArray();
-
-        res.json(loans.map(getLoanResponse));
-    } catch (error) {
-        handleError(res, error);
-    }
+app.get('/api/loans', (req, res) => {
+    res.json(loans.map(getLoanResponse));
 });
 
 // GET one loan
-app.get('/api/loans/:id', async (req, res) => {
-    try {
-        const loan = await findLoan(req.params.id);
+app.get('/api/loans/:id', (req, res) => {
+    const loan = findLoan(req.params.id);
 
-        if (!loan) {
-            return res.status(404).json({ error: 'Loan not found.' });
-        }
-
-        res.json(getLoanResponse(loan));
-    } catch (error) {
-        handleError(res, error);
+    if (!loan) {
+        return res.status(404).json({
+            error: 'Loan not found.'
+        });
     }
+
+    res.json(getLoanResponse(loan));
 });
 
-// BORROW a book
-app.post('/api/loans', async (req, res) => {
-    try {
-        const { memberId, bookId, borrowDate, dueDate } = req.body;
+// CREATE a loan / borrow a book
+app.post('/api/loans', (req, res) => {
+    const {
+        memberId,
+        bookId,
+        borrowDate,
+        dueDate
+    } = req.body;
 
-        if (!memberId || !bookId || !borrowDate || !dueDate) {
-            return res.status(400).json({
-                error: 'Member, book, borrow date, and due date are required.'
-            });
-        }
-
-        if (!validDate(borrowDate) || !validDate(dueDate)) {
-            return res.status(400).json({
-                error: 'Dates must use YYYY-MM-DD format.'
-            });
-        }
-
-        if (dueDate < borrowDate) {
-            return res.status(400).json({
-                error: 'Due date cannot be before the borrow date.'
-            });
-        }
-
-        const member = await findMember(memberId);
-        const book = await findBook(bookId);
-
-        if (!member) {
-            return res.status(404).json({ error: 'Member not found.' });
-        }
-
-        if (member.status !== 'Active') {
-            return res.status(400).json({
-                error: 'This member is not active.'
-            });
-        }
-
-        if (!book) {
-            return res.status(404).json({ error: 'Book not found.' });
-        }
-
-        // Atomically reserve one available copy.
-        const reservation = await db.collection(COLLECTIONS.books)
-            .updateOne(
-                {
-                    _id: book._id,
-                    availableCopies: { $gte: 1 }
-                },
-                { $inc: { availableCopies: -1 } }
-            );
-
-        if (reservation.modifiedCount !== 1) {
-            return res.status(400).json({
-                error: 'No available copies for this book.'
-            });
-        }
-
-        try {
-            const existingLoans = await db.collection(COLLECTIONS.loans)
-                .find({}, { projection: { id: 1 } })
-                .toArray();
-
-            const maxId = existingLoans.reduce((max, loan) => {
-                const id = Number(loan.id);
-                return Number.isInteger(id) ? Math.max(max, id) : max;
-            }, 0);
-
-            const nextId = await getNextSequence('loanId', maxId);
-
-            const loan = {
-                id: String(nextId),
-                memberId: String(member.id),
-                memberName: member.name,
-                bookId: String(book.bookId ?? book.id),
-                bookTitle: book.title,
-                borrowDate,
-                dueDate,
-                returnDate: null,
-                status: 'Active'
-            };
-
-            await db.collection(COLLECTIONS.loans).insertOne(loan);
-
-            return res.status(201).json({
-                message: 'Loan created successfully.',
-                loan: getLoanResponse(loan)
-            });
-        } catch (error) {
-            // Restore the copy if creating the loan fails.
-            await db.collection(COLLECTIONS.books).updateOne(
-                { _id: book._id },
-                { $inc: { availableCopies: 1 } }
-            );
-            throw error;
-        }
-    } catch (error) {
-        handleError(res, error);
+    if (!memberId || !bookId || !borrowDate || !dueDate) {
+        return res.status(400).json({
+            error: 'Member, book, borrow date, and due date are required.'
+        });
     }
+
+    if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(borrowDate) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) ||
+        Number.isNaN(Date.parse(borrowDate)) ||
+        Number.isNaN(Date.parse(dueDate))
+    ) {
+        return res.status(400).json({
+            error: 'Dates must use YYYY-MM-DD format.'
+        });
+    }
+
+    if (dueDate < borrowDate) {
+        return res.status(400).json({
+            error: 'Due date cannot be before the borrow date.'
+        });
+    }
+
+    const member = findMember(memberId);
+    const book = findBook(bookId);
+
+    if (!member) {
+        return res.status(404).json({
+            error: 'Member not found.'
+        });
+    }
+
+    if (member.status !== 'Active') {
+        return res.status(400).json({
+            error: 'This member is not active.'
+        });
+    }
+
+    if (!book) {
+        return res.status(404).json({
+            error: 'Book not found.'
+        });
+    }
+
+    if (Number(book.availableCopies) < 1) {
+        return res.status(400).json({
+            error: 'No available copies for this book.'
+        });
+    }
+
+    const loan = {
+        id: String(nextLoanId++),
+        memberId: String(member.id),
+        memberName: member.name,
+        bookId: String(book.bookId ?? book.id),
+        bookTitle: book.title,
+        borrowDate,
+        dueDate,
+        returnDate: null,
+        status: 'Active'
+    };
+
+    book.availableCopies = Number(book.availableCopies) - 1;
+    loans.push(loan);
+
+    res.status(201).json({
+        message: 'Loan created successfully.',
+        loan: getLoanResponse(loan)
+    });
 });
 
 // RETURN a borrowed book
-app.patch('/api/loans/:id/return', async (req, res) => {
-    try {
-        const loan = await findLoan(req.params.id);
+app.patch('/api/loans/:id/return', (req, res) => {
+    const loan = findLoan(req.params.id);
 
-        if (!loan) {
-            return res.status(404).json({ error: 'Loan not found.' });
-        }
-
-        if (loan.status === 'Returned') {
-            return res.status(400).json({
-                error: 'This book has already been returned.'
-            });
-        }
-
-        const book = await findBook(loan.bookId);
-
-        if (!book) {
-            return res.status(404).json({
-                error: 'Associated book not found.'
-            });
-        }
-
-        const returnDate = req.body?.returnDate || today();
-
-        if (!validDate(returnDate)) {
-            return res.status(400).json({
-                error: 'Return date must use YYYY-MM-DD format.'
-            });
-        }
-
-        // Change loan status only if it has not already been returned.
-        const updatedLoan = await db.collection(COLLECTIONS.loans)
-            .findOneAndUpdate(
-                { _id: loan._id, status: 'Active' },
-                {
-                    $set: {
-                        returnDate,
-                        status: 'Returned'
-                    }
-                },
-                { returnDocument: 'after' }
-            );
-
-        if (!updatedLoan) {
-            return res.status(400).json({
-                error: 'This loan has already been returned.'
-            });
-        }
-
-        await db.collection(COLLECTIONS.books).updateOne(
-            { _id: book._id },
-            [
-                {
-                    $set: {
-                        availableCopies: {
-                            $min: [
-                                '$totalCopies',
-                                { $add: ['$availableCopies', 1] }
-                            ]
-                        }
-                    }
-                }
-            ]
-        );
-
-        res.json({
-            message: 'Book returned successfully.',
-            loan: getLoanResponse(updatedLoan)
+    if (!loan) {
+        return res.status(404).json({
+            error: 'Loan not found.'
         });
-    } catch (error) {
-        handleError(res, error);
     }
+
+    if (loan.status === 'Returned') {
+        return res.status(400).json({
+            error: 'This book has already been returned.'
+        });
+    }
+
+    const book = findBook(loan.bookId);
+
+    if (!book) {
+        return res.status(404).json({
+            error: 'Associated book not found.'
+        });
+    }
+
+    const returnDate = req.body?.returnDate || today();
+
+    if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(returnDate) ||
+        Number.isNaN(Date.parse(returnDate))
+    ) {
+        return res.status(400).json({
+            error: 'Return date must use YYYY-MM-DD format.'
+        });
+    }
+
+    loan.returnDate = returnDate;
+    loan.status = 'Returned';
+
+    book.availableCopies = Math.min(
+        Number(book.totalCopies),
+        Number(book.availableCopies) + 1
+    );
+
+    res.json({
+        message: 'Book returned successfully.',
+        loan: getLoanResponse(loan)
+    });
 });
 
 // ==========================================
-// AUTHENTICATION
-// Passwords are stored as salted scrypt hashes.
+// AUTHENTICATION API
+// PROTOTYPE ONLY: passwords are NOT hashed.
+// Accounts are stored in memory and reset on restart.
 // ==========================================
-async function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
-    const derivedKey = await scrypt(password, salt, 64);
-
-    return {
-        passwordSalt: salt,
-        passwordHash: derivedKey.toString('hex')
-    };
-}
-
-async function verifyPassword(password, user) {
-    if (!user.passwordHash || !user.passwordSalt) {
-        return false;
-    }
-
-    const derivedKey = await scrypt(password, user.passwordSalt, 64);
-    const storedKey = Buffer.from(user.passwordHash, 'hex');
-
-    return storedKey.length === derivedKey.length &&
-        crypto.timingSafeEqual(storedKey, derivedKey);
-}
 
 // REGISTER
-app.post('/api/register', async (req, res) => {
-    try {
-        const { name, role, email, password } = req.body;
+app.post('/api/register', (req, res) => {
+    const { name, role, email, password } = req.body;
 
-        if (
-            !isNonEmptyString(name) ||
-            !isNonEmptyString(email) ||
-            !isNonEmptyString(password)
-        ) {
-            return res.status(400).json({
-                error: 'Name, email, and password are required.'
-            });
-        }
-
-        if (password.length < 8) {
-            return res.status(400).json({
-                error: 'Password must be at least 8 characters.'
-            });
-        }
-
-        const normalizedEmail = email.trim().toLowerCase();
-
-        const existingUser = await db.collection(COLLECTIONS.users)
-            .findOne({ email: normalizedEmail });
-
-        if (existingUser) {
-            return res.status(409).json({
-                error: 'Email is already registered.'
-            });
-        }
-
-        const allowedRoles = ['Main Librarian', 'Librarian'];
-        const safeRole = allowedRoles.includes(role) ? role : 'Librarian';
-        const passwordFields = await hashPassword(password);
-
-        const newUser = {
-            name: name.trim(),
-            role: safeRole,
-            email: normalizedEmail,
-            ...passwordFields,
-            createdAt: new Date()
-        };
-
-        await db.collection(COLLECTIONS.users).insertOne(newUser);
-
-        res.status(201).json({
-            message: 'Account created successfully.',
-            user: {
-                name: newUser.name,
-                role: newUser.role,
-                email: newUser.email
-            }
+    if (
+        !isNonEmptyString(name) ||
+        !isNonEmptyString(email) ||
+        !isNonEmptyString(password)
+    ) {
+        return res.status(400).json({
+            error: 'Name, email, and password are required.'
         });
-    } catch (error) {
-        handleError(res, error);
     }
+
+    if (password.length < 8) {
+        return res.status(400).json({
+            error: 'Password must be at least 8 characters.'
+        });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const existingUser = users.find(
+        user => user.email === normalizedEmail
+    );
+
+    if (existingUser) {
+        return res.status(409).json({
+            error: 'Email is already registered.'
+        });
+    }
+
+    // Do not allow public registration to grant privileged roles.
+    const allowedRoles = ['Main Librarian', 'Librarian'];
+    const safeRole = allowedRoles.includes(role)
+        ? role
+        : 'Librarian';
+
+    const newUser = {
+        name: name.trim(),
+        role: safeRole,
+        email: normalizedEmail,
+        password
+    };
+
+    users.push(newUser);
+
+    res.status(201).json({
+        message: 'Account created successfully.',
+        user: {
+            name: newUser.name,
+            role: newUser.role,
+            email: newUser.email
+        }
+    });
 });
 
 // LOGIN
-app.post('/api/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
+app.post('/api/login', (req, res) => {
+    const { email, password } = req.body;
 
-        if (!isNonEmptyString(email) || !isNonEmptyString(password)) {
-            return res.status(400).json({
-                error: 'Email and password are required.'
-            });
-        }
-
-        const normalizedEmail = email.trim().toLowerCase();
-
-        const user = await db.collection(COLLECTIONS.users)
-            .findOne({ email: normalizedEmail });
-
-        if (!user || !(await verifyPassword(password, user))) {
-            return res.status(401).json({
-                error: 'Invalid email address or password.'
-            });
-        }
-
-        res.json({
-            message: 'Login successful.',
-            user: {
-                name: user.name,
-                role: user.role,
-                email: user.email
-            }
+    if (!isNonEmptyString(email) || !isNonEmptyString(password)) {
+        return res.status(400).json({
+            error: 'Email and password are required.'
         });
-    } catch (error) {
-        handleError(res, error);
     }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const user = users.find(
+        u => u.email === normalizedEmail && u.password === password
+    );
+
+    if (!user) {
+        return res.status(401).json({
+            error: 'Invalid email address or password.'
+        });
+    }
+
+    res.json({
+        message: 'Login successful.',
+        user: {
+            name: user.name,
+            role: user.role,
+            email: user.email
+        }
+    });
 });
 
 // ==========================================
 // FRONTEND ROUTING
 // ==========================================
+
 const loginFile = path.join(__dirname, 'login.html');
 const dashboardFile = path.join(__dirname, 'lms.html');
 
+// Root URL: open login page.
 app.get('/', (req, res) => {
     if (!fs.existsSync(loginFile)) {
-        return res.status(500).send('login.html was not found.');
+        return res.status(500).send(
+            'login.html was not found in the deployed server directory.'
+        );
     }
 
     res.sendFile(loginFile);
 });
 
+// Explicit login route.
 app.get('/login.html', (req, res) => {
     if (!fs.existsSync(loginFile)) {
-        return res.status(404).send('login.html was not found.');
+        return res.status(404).send(
+            'login.html was not found in the deployed server directory.'
+        );
     }
 
     res.sendFile(loginFile);
 });
 
+// Explicit dashboard route.
 app.get('/lms.html', (req, res) => {
     if (!fs.existsSync(dashboardFile)) {
         return res.status(404).send(
-            'lms.html was not found. Check your GitHub repository.'
+            'lms.html was not found in the deployed server directory. Check that the file is committed to GitHub and included in the Render deployment.'
         );
     }
 
     res.sendFile(dashboardFile);
 });
 
+// Serve other frontend assets.
 app.use(express.static(__dirname));
 
 // ==========================================
 // ERROR HANDLING
 // ==========================================
+
+// Malformed JSON request body.
 app.use((err, req, res, next) => {
     if (err instanceof SyntaxError && 'body' in err) {
         return res.status(400).json({
@@ -801,16 +605,20 @@ app.use((err, req, res, next) => {
     next(err);
 });
 
+// Unknown API endpoints.
 app.use('/api', (req, res) => {
     res.status(404).json({
         error: `API route not found: ${req.method} ${req.originalUrl}`
     });
 });
 
+// General fallback error handler.
 app.use((err, req, res, next) => {
     console.error('Server error:', err);
 
-    if (res.headersSent) return next(err);
+    if (res.headersSent) {
+        return next(err);
+    }
 
     res.status(500).json({
         error: 'Internal server error.'
@@ -818,131 +626,9 @@ app.use((err, req, res, next) => {
 });
 
 // ==========================================
-// INITIAL DATABASE SETUP
+// START SERVER
 // ==========================================
-async function initializeDatabase() {
-    const books = db.collection(COLLECTIONS.books);
-    const members = db.collection(COLLECTIONS.members);
-    const users = db.collection(COLLECTIONS.users);
-
-    // Ensure account emails cannot be duplicated.
-    await users.createIndex({ email: 1 }, { unique: true });
-
-    // Seed the example book only when the collection is empty.
-    if (await books.countDocuments() === 0) {
-        await books.insertOne({
-            bookId: '101',
-            title: 'The Great King',
-            author: 'Luther',
-            isbn: 'LB-101',
-            genre: 'Classic Fiction',
-            totalCopies: 5,
-            availableCopies: 5,
-            shelf: 'A-01'
-        });
-    }
-
-    // Seed the example member only when the collection is empty.
-    if (await members.countDocuments() === 0) {
-        await members.insertOne({
-            id: 'M-001',
-            name: 'Juan Dela Cruz',
-            email: 'juan@example.com',
-            status: 'Active',
-            fineBalance: 0
-        });
-    }
-
-    // Initialize counters from existing database IDs.
-    const allBooks = await books.find(
-        {}, { projection: { bookId: 1 } }
-    ).toArray();
-
-    const maxBookId = allBooks.reduce((max, book) => {
-        const id = Number(book.bookId);
-        return Number.isInteger(id) ? Math.max(max, id) : max;
-    }, 100);
-
-    await db.collection(COLLECTIONS.counters).updateOne(
-        { _id: 'bookId' },
-        { $max: { seq: maxBookId } },
-        { upsert: true }
-    );
-
-    const allMembers = await members.find(
-        {}, { projection: { id: 1 } }
-    ).toArray();
-
-    const maxMemberId = allMembers.reduce((max, member) => {
-        const match = String(member.id).match(/^M-(\d+)$/);
-        return match ? Math.max(max, Number(match[1])) : max;
-    }, 0);
-
-    await db.collection(COLLECTIONS.counters).updateOne(
-        { _id: 'memberId' },
-        { $max: { seq: maxMemberId } },
-        { upsert: true }
-    );
-
-    const allLoans = await db.collection(COLLECTIONS.loans).find(
-        {}, { projection: { id: 1 } }
-    ).toArray();
-
-    const maxLoanId = allLoans.reduce((max, loan) => {
-        const id = Number(loan.id);
-        return Number.isInteger(id) ? Math.max(max, id) : max;
-    }, 0);
-
-    await db.collection(COLLECTIONS.counters).updateOne(
-        { _id: 'loanId' },
-        { $max: { seq: maxLoanId } },
-        { upsert: true }
-    );
-
-    console.log('MongoDB collections initialized.');
-}
-
-// ==========================================
-// CONNECT TO ATLAS AND START SERVER
-// ==========================================
-async function startServer() {
-    const mongoURI = process.env.MONGODB_URI;
-
-    if (mongoURI) {
-        try {
-            mongoClient = new MongoClient(mongoURI, {
-                serverSelectionTimeoutMS: 10000
-            });
-
-            await mongoClient.connect();
-
-            db = mongoClient.db('lms');
-            await db.command({ ping: 1 });
-            await initializeDatabase();
-
-            mongoConnected = true;
-
-            console.log('MongoDB Atlas connected successfully.');
-            console.log('Database selected: lms');
-        } catch (error) {
-            mongoConnected = false;
-            db = null;
-
-            console.error('MongoDB connection failed:', error.message);
-
-            if (mongoClient) {
-                await mongoClient.close().catch(() => {});
-                mongoClient = null;
-            }
-        }
-    } else {
-        console.error('MONGODB_URI is missing from the environment.');
-    }
-
-    app.listen(PORT, () => {
-        console.log(`ARCHIVE LMS running on port ${PORT}`);
-        console.log('Health check: /api/health');
-    });
-}
-
-startServer();
+app.listen(PORT, () => {
+    console.log(`ARCHIVE LMS running on port ${PORT}`);
+    console.log(`Health check: /api/health`);
+});
