@@ -4,11 +4,11 @@ const path = require('path');
 
 const app = express();
 
-// Middleware
+
 app.use(express.json());
 app.use(cors());
 
-
+// Mag-serve ng static files (tulad ng login.html, lms.html, etc.) galing sa current folder
 app.use(express.static(path.join(__dirname)));
 
 // ==========================================
@@ -27,7 +27,7 @@ app.get('/api/books', (req, res) => {
     res.json(books);
 });
 
-// POST: Magdagdag ng bagong libro
+// POST: 
 app.post('/api/books', (req, res) => {
     const newBook = req.body;
     books.push(newBook);
@@ -51,7 +51,7 @@ app.post('/api/members', (req, res) => {
 // ==========================================
 let users = []; // Temporary user storage
 
-// POST: Register 
+// POST: Register bagong user
 app.post('/api/register', (req, res) => {
     const { name, role, email, password } = req.body;
     
