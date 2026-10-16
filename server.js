@@ -3,9 +3,17 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const { MongoClient } = require('mongodb');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// ==========================================
+// MONGODB ATLAS CONNECTION
+// ==========================================
+let mongoClient;
+let db;
+let mongoConnected = false;
 
 // ==========================================
 // MIDDLEWARE
@@ -15,7 +23,9 @@ app.use(express.json({ limit: '1mb' }));
 
 // ==========================================
 // TEMPORARY IN-MEMORY STORAGE
-// Data resets when the server restarts.
+// Records still reset when the server restarts.
+// MongoDB connection is added, but APIs still
+// need migration to make records persistent.
 // ==========================================
 let books = [
     {
@@ -90,11 +100,7 @@ function getLoanResponse(loan) {
 }
 
 function validateBook(body, existingBook = null) {
-    const {
-        title,
-        author,
-        isbn
-    } = body;
+    const { title, author, isbn } = body;
 
     if (!isNonEmptyString(title)) {
         return 'Book title is required.';
@@ -135,6 +141,7 @@ app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
         message: 'ARCHIVE LMS API is running.',
+        database: mongoConnected ? 'connected' : 'disconnected',
         timestamp: new Date().toISOString()
     });
 });
@@ -626,9 +633,45 @@ app.use((err, req, res, next) => {
 });
 
 // ==========================================
-// START SERVER
+// START SERVER + MONGODB CONNECTION
 // ==========================================
-app.listen(PORT, () => {
-    console.log(`ARCHIVE LMS running on port ${PORT}`);
-    console.log(`Health check: /api/health`);
-});
+async function startServer() {
+    try {
+        const mongoURI = process.env.MONGODB_URI;
+
+        if (!mongoURI) {
+            throw new Error(
+                'MONGODB_URI is missing from Render Environment.'
+            );
+        }
+
+        mongoClient = new MongoClient(mongoURI);
+
+        await mongoClient.connect();
+
+        db = mongoClient.db('lms');
+
+        // Verify that the database connection responds.
+        await db.command({ ping: 1 });
+
+        mongoConnected = true;
+
+        console.log('MongoDB Atlas connected successfully.');
+
+        app.listen(PORT, () => {
+            console.log(`ARCHIVE LMS running on port ${PORT}`);
+            console.log('Health check: /api/health');
+        });
+    } catch (error) {
+        mongoConnected = false;
+        console.error('Startup failed:', error.message);
+
+        if (mongoClient) {
+            await mongoClient.close().catch(() => {});
+        }
+
+        process.exit(1);
+    }
+}
+
+startServer();
