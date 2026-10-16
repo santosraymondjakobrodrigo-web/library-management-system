@@ -1,6 +1,4 @@
-from pathlib import Path
-
-html = r'''<!DOCTYPE html>
+'''<!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-100">
 <head>
   <meta charset="UTF-8" />
@@ -546,6 +544,4 @@ html = r'''<!DOCTYPE html>
 </html>
 '''
 
-path = Path("/mnt/data/archive_lms_upgraded.html")
-path.write_text(html, encoding="utf-8")
-print(f"Created {path} ({len(html):,} characters, {len(html.splitlines()):,} lines)")
+
