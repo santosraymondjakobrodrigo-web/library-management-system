@@ -4,18 +4,16 @@ const path = require('path');
 
 const app = express();
 
-// Middleware para sa JSON at CORS
+// Middleware
 app.use(express.json());
 app.use(cors());
 
-// Mag-serve ng static files (tulad ng login.html, lms.html, etc.) galing sa current folder
+
 app.use(express.static(path.join(__dirname)));
 
 // ==========================================
-// MGA API ROUTES
+// MGA API ROUTES (Books & Members)
 // ==========================================
-
-// Temporary storage (Pwede mong palitan ng database tulad ng Supabase o MS Access connection dito)
 let books = [
     { bookId: "101", title: "The Great King", author: "Luther", isbn: "LB-101", genre: "Classic Fiction", totalCopies: 5, availableCopies: 5, shelf: "A-01" }
 ];
@@ -24,7 +22,7 @@ let members = [
     { id: "M-001", name: "Juan Dela Cruz", email: "juan@example.com", status: "Active", fineBalance: 0.00 }
 ];
 
-// GET: Kunin ang listahan ng mga libro
+// GET: 
 app.get('/api/books', (req, res) => {
     res.json(books);
 });
@@ -49,7 +47,39 @@ app.post('/api/members', (req, res) => {
 });
 
 // ==========================================
-// ROOT ROUTING PARA SA LOGIN
+// AUTHENTICATION API ROUTES (Login & Register)
+// ==========================================
+let users = []; // Temporary user storage
+
+// POST: Register 
+app.post('/api/register', (req, res) => {
+    const { name, role, email, password } = req.body;
+    
+    // Check kung may existing user na
+    const existingUser = users.find(u => u.email === email);
+    if (existingUser) {
+        return res.status(400).json({ error: 'Email is already registered.' });
+    }
+
+    const newUser = { name, role, email, password };
+    users.push(newUser);
+    res.status(201).json({ message: "Account created successfully!", user: { name, role, email } });
+});
+
+// POST: Login user
+app.post('/api/login', (req, res) => {
+    const { email, password } = req.body;
+    
+    const user = users.find(u => u.email === email && u.password === password);
+    if (!user) {
+        return res.status(400).json({ error: 'Invalid email address or password.' });
+    }
+
+    res.json({ message: "Login successful!", user: { name: user.name, role: user.role, email: user.email } });
+});
+
+// ==========================================
+// ROOT ROUTING 
 // ==========================================
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'login.html'));
