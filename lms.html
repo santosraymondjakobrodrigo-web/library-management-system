@@ -208,58 +208,200 @@
 
 <div id="toast" role="status" aria-live="polite" class="fixed bottom-5 right-5 z-[70] hidden max-w-sm rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl"></div>
 
+
 <script>
   // Frontend only. Data persistence and permissions must be implemented by the backend.
   const DEFAULT_API_BASE_URL = 'http://localhost:3000';
   let API_BASE_URL = localStorage.getItem('lms_api_url') || DEFAULT_API_BASE_URL;
-  let activeSession = safeParse(localStorage.getItem('lms_session')) || { name: 'System Admin', role: 'Main Librarian' };
+  let activeSession = safeParse(localStorage.getItem('lms_session'));
+
   let books = [], members = [], loans = [];
   let loansApiAvailable = false;
   let activityLog = [];
   let toastTimer = null;
-  const titles = { dashboard:'Overview', catalog:'Book catalog', members:'Members directory', loans:'Circulation & loans', reports:'Analytics & reports', settings:'System settings' };
 
-  function safeParse(value) { try { return JSON.parse(value); } catch { return null; } }
-  function esc(value) {
-    return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const titles = {
+    dashboard: 'Overview',
+    catalog: 'Book catalog',
+    members: 'Members directory',
+    loans: 'Circulation & loans',
+    reports: 'Analytics & reports',
+    settings: 'System settings'
+  };
+
+  function safeParse(value) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
   }
-  function first(obj, keys, fallback='') {
-    for (const key of keys) if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
+
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[ch]));
+  }
+
+  function first(obj, keys, fallback = '') {
+    for (const key of keys) {
+      if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
+        return obj[key];
+      }
+    }
     return fallback;
   }
-  function bookId(b) { return String(first(b,['bookId','BookID','BookId','id','ID','BOOKID'],'')); }
-  function bookTitle(b) { return String(first(b,['title','Title','TITLE'],'Untitled')); }
-  function bookAuthor(b) { return String(first(b,['author','Author','AUTHOR'],'Unknown author')); }
-  function bookISBN(b) { return String(first(b,['isbn','ISBN'],'—')); }
-  function bookGenre(b) { return String(first(b,['genre','Genre','GENRE'],'Unclassified')); }
-  function bookShelf(b) { return String(first(b,['shelf','Shelf','SHELF'],'—')); }
-  function totalCopies(b) { const n = Number(first(b,['totalCopies','TotalCopies','TOTALCOPIES','copies'],0)); return Number.isFinite(n) && n >= 0 ? n : 0; }
-  function availableCopies(b) { const n = Number(first(b,['availableCopies','AvailableCopies','AVAILABLECOPIES'],totalCopies(b))); return Number.isFinite(n) ? Math.max(0,n) : 0; }
-  function memberId(m) { return String(first(m,['id','memberId','ID','MemberID','MEMBERID'],'')); }
-  function memberName(m) { return String(first(m,['name','Name','NAME','fullName'],'Unknown member')); }
-  function memberEmail(m) { return String(first(m,['email','Email','EMAIL'],'—')); }
-  function loanId(l) { return String(first(l,['id','loanId','LoanID','loanID','LOANID'],'')); }
-  function loanBookRef(l) { return String(first(l,['bookId','BookID','book_id'],'')); }
-  function loanMemberRef(l) { return String(first(l,['memberId','MemberID','member_id'],'')); }
-  function loanBorrowDate(l) { return String(first(l,['borrowDate','BorrowDate','borrowedAt','borrowed_at','issueDate'],'' )).slice(0,10); }
-  function loanDueDate(l) { return String(first(l,['dueDate','DueDate','due_date'],'' )).slice(0,10); }
-  function loanReturnDate(l) { return String(first(l,['returnDate','ReturnDate','returnedAt','returned_at'],'' )).slice(0,10); }
-  function isReturned(l) { const s = String(first(l,['status','Status'],'')).toLowerCase(); return Boolean(loanReturnDate(l)) || ['returned','closed','complete','completed'].includes(s); }
-  function isOverdue(l) { return !isReturned(l) && !!loanDueDate(l) && loanDueDate(l) < localDateISO(); }
-  function localDateISO(date=new Date()) { const d = new Date(date.getTime() - date.getTimezoneOffset()*60000); return d.toISOString().slice(0,10); }
-  function formatDate(value) { if (!value) return '—'; const d = new Date(value.length===10 ? value+'T00:00:00' : value); return Number.isNaN(d.getTime()) ? esc(value) : d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
-  function initials(name) { return String(name || 'SA').trim().split(/\s+/).filter(Boolean).slice(0,2).map(s=>s[0]).join('').toUpperCase() || 'SA'; }
+
+  function bookId(b) {
+    return String(first(b, ['bookId', 'BookID', 'BookId', 'id', 'ID', 'BOOKID'], ''));
+  }
+
+  function bookTitle(b) {
+    return String(first(b, ['title', 'Title', 'TITLE'], 'Untitled'));
+  }
+
+  function bookAuthor(b) {
+    return String(first(b, ['author', 'Author', 'AUTHOR'], 'Unknown author'));
+  }
+
+  function bookISBN(b) {
+    return String(first(b, ['isbn', 'ISBN'], '—'));
+  }
+
+  function bookGenre(b) {
+    return String(first(b, ['genre', 'Genre', 'GENRE'], 'Unclassified'));
+  }
+
+  function bookShelf(b) {
+    return String(first(b, ['shelf', 'Shelf', 'SHELF'], '—'));
+  }
+
+  function totalCopies(b) {
+    const n = Number(first(b, ['totalCopies', 'TotalCopies', 'TOTALCOPIES', 'copies'], 0));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+
+  function availableCopies(b) {
+    const n = Number(first(b, ['availableCopies', 'AvailableCopies', 'AVAILABLECOPIES'], totalCopies(b)));
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
+  }
+
+  function memberId(m) {
+    return String(first(m, ['id', 'memberId', 'ID', 'MemberID', 'MEMBERID'], ''));
+  }
+
+  function memberName(m) {
+    return String(first(m, ['name', 'Name', 'NAME', 'fullName'], 'Unknown member'));
+  }
+
+  function memberEmail(m) {
+    return String(first(m, ['email', 'Email', 'EMAIL'], '—'));
+  }
+
+  function loanId(l) {
+    return String(first(l, ['id', 'loanId', 'LoanID', 'loanID', 'LOANID'], ''));
+  }
+
+  function loanBookRef(l) {
+    return String(first(l, ['bookId', 'BookID', 'book_id'], ''));
+  }
+
+  function loanMemberRef(l) {
+    return String(first(l, ['memberId', 'MemberID', 'member_id'], ''));
+  }
+
+  function loanBorrowDate(l) {
+    return String(first(l, ['borrowDate', 'BorrowDate', 'borrowedAt', 'borrowed_at', 'issueDate'], '')).slice(0, 10);
+  }
+
+  function loanDueDate(l) {
+    return String(first(l, ['dueDate', 'DueDate', 'due_date'], '')).slice(0, 10);
+  }
+
+  function loanReturnDate(l) {
+    return String(first(l, ['returnDate', 'ReturnDate', 'returnedAt', 'returned_at'], '')).slice(0, 10);
+  }
+
+  function isReturned(l) {
+    const s = String(first(l, ['status', 'Status'], '')).toLowerCase();
+    return Boolean(loanReturnDate(l)) ||
+      ['returned', 'closed', 'complete', 'completed'].includes(s);
+  }
+
+  function isOverdue(l) {
+    return !isReturned(l) && !!loanDueDate(l) && loanDueDate(l) < localDateISO();
+  }
+
+  function localDateISO(date = new Date()) {
+    const d = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function formatDate(value) {
+    if (!value) return '—';
+    const d = new Date(value.length === 10 ? value + 'T00:00:00' : value);
+    return Number.isNaN(d.getTime())
+      ? esc(value)
+      : d.toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+  }
+
+  function initials(name) {
+    return String(name || 'SA')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(s => s[0])
+      .join('')
+      .toUpperCase() || 'SA';
+  }
 
   window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-api-url').value = API_BASE_URL;
-    document.getElementById('today-label').textContent = new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+
+    document.getElementById('today-label').textContent =
+      new Date().toLocaleDateString(undefined, {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      });
+
     document.getElementById('loan-borrow-date').value = localDateISO();
-    const due = new Date(); due.setDate(due.getDate()+14); document.getElementById('loan-due-date').value = localDateISO(due);
-    loadUserProfile();
-    renderActivity();
-    loadDataFromDatabase(false);
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal').forEach(m=>m.classList.add('hidden')); });
-    document.addEventListener('click', e => { if (!e.target.closest('#global-search') && !e.target.closest('#global-search-results')) document.getElementById('global-search-results').classList.add('hidden'); });
+
+    const due = new Date();
+    due.setDate(due.getDate() + 14);
+    document.getElementById('loan-due-date').value = localDateISO(due);
+
+    // Do not initialize the dashboard without a saved session.
+    if (activeSession) {
+      loadUserProfile();
+      renderActivity();
+      loadDataFromDatabase(false);
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+      }
+    });
+
+    document.addEventListener('click', e => {
+      if (
+        !e.target.closest('#global-search') &&
+        !e.target.closest('#global-search-results')
+      ) {
+        document.getElementById('global-search-results').classList.add('hidden');
+      }
+    });
   });
 
   function loadUserProfile() {
@@ -269,6 +411,7 @@
     document.getElementById('sidebar-initials').textContent = initials(name);
     document.getElementById('welcome-name').textContent = name.split(' ')[0] || 'Librarian';
   }
+
   function toggleSidebar(force) {
     const sidebar = document.getElementById('sidebar'), backdrop = document.getElementById('sidebar-backdrop');
     const shouldOpen = force === undefined ? sidebar.classList.contains('-translate-x-full') : force;
