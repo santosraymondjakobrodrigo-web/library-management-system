@@ -2,6 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -92,9 +93,7 @@ function validateBook(body, existingBook = null) {
     const {
         title,
         author,
-        isbn,
-        genre,
-        shelf
+        isbn
     } = body;
 
     if (!isNonEmptyString(title)) {
@@ -207,7 +206,6 @@ app.put('/api/books/:id', (req, res) => {
         return res.status(400).json({ error });
     }
 
-    // Count how many copies are currently on loan.
     const checkedOut = loans.filter(loan =>
         loan.bookId === String(book.bookId) &&
         loan.status === 'Active'
@@ -457,6 +455,7 @@ app.patch('/api/loans/:id/return', (req, res) => {
 // ==========================================
 // AUTHENTICATION API
 // PROTOTYPE ONLY: passwords are NOT hashed.
+// Accounts are stored in memory and reset on restart.
 // ==========================================
 
 // REGISTER
@@ -552,19 +551,50 @@ app.post('/api/login', (req, res) => {
 // FRONTEND ROUTING
 // ==========================================
 
-// Open login.html at the root URL.
+const loginFile = path.join(__dirname, 'login.html');
+const dashboardFile = path.join(__dirname, 'lms.html');
+
+// Root URL: open login page.
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'login.html'));
+    if (!fs.existsSync(loginFile)) {
+        return res.status(500).send(
+            'login.html was not found in the deployed server directory.'
+        );
+    }
+
+    res.sendFile(loginFile);
 });
 
-// Serve HTML, CSS, JS, and other frontend assets.
+// Explicit login route.
+app.get('/login.html', (req, res) => {
+    if (!fs.existsSync(loginFile)) {
+        return res.status(404).send(
+            'login.html was not found in the deployed server directory.'
+        );
+    }
+
+    res.sendFile(loginFile);
+});
+
+// Explicit dashboard route.
+app.get('/lms.html', (req, res) => {
+    if (!fs.existsSync(dashboardFile)) {
+        return res.status(404).send(
+            'lms.html was not found in the deployed server directory. Check that the file is committed to GitHub and included in the Render deployment.'
+        );
+    }
+
+    res.sendFile(dashboardFile);
+});
+
+// Serve other frontend assets.
 app.use(express.static(__dirname));
 
 // ==========================================
 // ERROR HANDLING
 // ==========================================
 
-// Malformed JSON request body
+// Malformed JSON request body.
 app.use((err, req, res, next) => {
     if (err instanceof SyntaxError && 'body' in err) {
         return res.status(400).json({
@@ -575,14 +605,14 @@ app.use((err, req, res, next) => {
     next(err);
 });
 
-// Unknown API endpoints
+// Unknown API endpoints.
 app.use('/api', (req, res) => {
     res.status(404).json({
         error: `API route not found: ${req.method} ${req.originalUrl}`
     });
 });
 
-// General fallback error handler
+// General fallback error handler.
 app.use((err, req, res, next) => {
     console.error('Server error:', err);
 
@@ -599,6 +629,6 @@ app.use((err, req, res, next) => {
 // START SERVER
 // ==========================================
 app.listen(PORT, () => {
-    console.log(`ARCHIVE LMS running at http://localhost:${PORT}`);
-    console.log(`Health check: http://localhost:${PORT}/api/health`);
+    console.log(`ARCHIVE LMS running on port ${PORT}`);
+    console.log(`Health check: /api/health`);
 });
